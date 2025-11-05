@@ -39,15 +39,22 @@ Description
 argList::addOption
 (
     "pool",
-    "pool-type",
-    "Choose memory pool type"
+    "word",
+    "Select memory pool type"
 );
 
 argList::addOption
 (
     "poolSize",
     "size [GB]",
-    "MemoryPool size (useless for dummyMemoryPool)"
+    "Set memory pool size (useless for dummyMemoryPool)"
+);
+
+argList::addOption
+(
+    "arch",
+    "word",
+    "Select the machine architecture"
 );
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

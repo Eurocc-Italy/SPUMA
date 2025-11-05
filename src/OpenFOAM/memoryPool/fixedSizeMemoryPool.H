@@ -32,13 +32,12 @@ Description
     A memory pool implementation characterized by a fixed size pool.
 
 SourceFiles
-    fixedSizeMemoryPool.H
     fixedSizeMemoryPool.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef fixed_Size_Memory_Pool_Executor_H
-#define fixed_Size_Memory_Pool_Executor_H
+#ifndef Foam_fixed_Size_Memory_Pool_Executor_H
+#define Foam_fixed_Size_Memory_Pool_Executor_H
 
 #include <iostream>
 #include "MemoryPool.H"
@@ -52,7 +51,9 @@ namespace Foam
                           Class fixedSizeMemoryPool Declaration
 \*---------------------------------------------------------------------------*/
 
-class fixedSizeMemoryPool:
+template<class T>
+class fixedSizeMemoryPool
+:
     public MemoryPool
 {
 
@@ -64,6 +65,8 @@ private:
     // Private constructor to prevent instancing
     fixedSizeMemoryPool(const uint64_t size);
 
+    //- typedef for the memory executor backend
+    typedef T foamMemoryExecutor;
 
 public:
 
@@ -173,7 +176,8 @@ public:
 
 // inline member functions
 
-inline bool Foam::fixedSizeMemoryPool::isValid(void* poolPtr)
+template<class T>
+inline bool Foam::fixedSizeMemoryPool<T>::isValid(void* poolPtr)
 {
     if ( !poolPtr ) return false;
 
@@ -186,7 +190,9 @@ inline bool Foam::fixedSizeMemoryPool::isValid(void* poolPtr)
     return valid;
 }
 
-inline bool Foam::fixedSizeMemoryPool::isInBlockRange(void* ptr)
+
+template<class T>
+inline bool Foam::fixedSizeMemoryPool<T>::isInBlockRange(void* ptr)
 {
     // case when ptr is null
     if (!ptr) return false;
@@ -208,6 +214,13 @@ inline bool Foam::fixedSizeMemoryPool::isInBlockRange(void* ptr)
 
     return inRange;
 }
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+    #include "fixedSizeMemoryPool.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

@@ -34,10 +34,8 @@ $(fileOps)/collatedFileOperation/OFstreamCollator.C
 $(DEVICE_SOURCE)
 device/deviceInit/deviceInit.C
 pool = memoryPool
+$(pool)/MemoryPoolManager.C
 $(pool)/MemoryPool.C
-$(pool)/fixedSizeMemoryPool.C
-$(pool)/dummyMemoryPool.C
-$(UMPIRE_SOURCE)
 
 parallel/processorTopology/processorTopology.C
 

@@ -29,7 +29,7 @@ License
 
 #include "error.H"
 // <algorithm> already included by stdFoam.H
-#include "MemoryPool.H"
+#include "MemoryPoolManager.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -52,7 +52,7 @@ inline Foam::UList<T>::UList(T* __restrict__ v, const label len, bool usePool) n
 
 
 // * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
-// TODO memorypool
+	
 template<class T>
 inline void Foam::UList<T>::fill_uniform(const T& val)
 {
@@ -66,7 +66,7 @@ inline void Foam::UList<T>::fill_uniform(const T& val)
 
     if(this->usePool_)
     {
-        Foam::MemoryPool::getInstance()->memSet
+        Foam::MemoryPoolManager::getMemoryPoolInstance()->memSet
         (
             this->v_,
             (void*)&val,
@@ -84,7 +84,7 @@ inline void Foam::UList<T>::fill_uniform(const T& val)
 
 }
 
-// TODO MemmoryPool
+
 template<class T>
 inline void Foam::UList<T>::fill_uniform(const Foam::zero)
 {
@@ -104,7 +104,7 @@ inline void Foam::UList<T>::fill_uniform(const Foam::zero)
 
         if(this->usePool_)
         {
-            Foam::MemoryPool::getInstance()->memSet
+            Foam::MemoryPoolManager::getMemoryPoolInstance()->memSet
             (
                 this->v_,
                 0,
@@ -140,7 +140,7 @@ inline bool Foam::UList<T>::usePool() const
     #ifdef FULLDEBUG
     if(this->usePool_)
     {
-        if(!MemoryPool::getInstance()->isValid(v_))
+        if(!MemoryPoolManager::getMemoryPoolInstance()->isValid(v_))
             FatalErrorInFunction
                 <<"Ulist use Pool but pointer is not allocated with pool"
                 <<abort(FatalError);
@@ -404,8 +404,8 @@ inline void Foam::UList<T>::shallowCopy(const UList<T>& list) noexcept
     }
     if
     (
-        !MemoryPool::getInstance()->isValid(list.v_) &&
-        !MemoryPool::getInstance()->isInBlockRange(list.v_)
+        !MemoryPoolManager::getMemoryPoolInstance()->isValid(list.v_) &&
+        !MemoryPoolManager::getMemoryPoolInstance()->isInBlockRange(list.v_)
     )
     {
         FatalErrorInFunction<<"Error shallow copy of non valid ptr"<<abort(FatalError);

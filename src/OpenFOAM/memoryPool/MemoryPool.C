@@ -34,18 +34,25 @@ License
 #endif
 #include "fixedSizeMemoryPool.H"
 #include "dummyMemoryPool.H"
+#include "memoryExecutors.H"
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * Static Member Data  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
     defineTypeNameAndDebug(MemoryPool,  0);
 }
 
-// Null, because instance will be initialized on demand.
-Foam::MemoryPool* Foam::MemoryPool::instance = nullptr;
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::MemoryPool::MemoryPool():
+    size_(0),
+    allocatedSize_(0),
+    unallocatedSize_(0),
+    maxOccupancy_(0)
+{};
 
 Foam::MemoryPool::MemoryPool(const dictionary& dict):
     size_(0),
@@ -54,59 +61,105 @@ Foam::MemoryPool::MemoryPool(const dictionary& dict):
     maxOccupancy_(0)
 {};
 
+
 // * * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * //
 
 Foam::MemoryPool::~MemoryPool()
 {
-    delete instance;
 }
+
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 Foam::MemoryPool* Foam::MemoryPool::New
 (
-    const word& type,
+    const word arch,
+    const word type,
     const uint64_t size
 )
 {
-    if (!instance)
+    MemoryPool* instance = nullptr;
+
+    if (type == "fixedSizeMemoryPool")
     {
-        if(type == "fixedSizeMemoryPool")
+        if (arch == "cpu")
         {
-            instance = new fixedSizeMemoryPool(size);
+            instance = new fixedSizeMemoryPool<cpuMemoryExecutor>(size);
         }
-        else if (type == "dummyMemoryPool")
+#ifdef have_cuda
+        else if (arch == "cuda")
         {
-            instance = new dummyMemoryPool(size);
-        }
-#ifdef have_umpire
-        else if (type == "umpireMemoryPool")
+            instance = new fixedSizeMemoryPool<cudaMemoryExecutor>(size);
+        }   
+#elif have_hip
+        else if (arch == "hip")
         {
-            instance = new umpireMemoryPool(size);
+            instance = new fixedSizeMemoryPool<hipMemoryExecutor>(size);
         }
 #endif
         else
         {
-            FatalErrorInFunction
+            FatalErrorInFunction << arch << " architecture is not supported."
+                << exit(FatalError);
+        }
+    }
+    else if (type == "dummyMemoryPool")
+    {
+        if (arch == "cpu")
+        {
+            instance = new dummyMemoryPool<cpuMemoryExecutor>(size);
+        }
+#ifdef have_cuda
+        else if (arch == "cuda")
+        {
+            instance = new dummyMemoryPool<cudaMemoryExecutor>(size);
+        }
+#elif have_hip
+        else if (arch == "hip")
+        {
+            instance = new dummyMemoryPool<hipMemoryExecutor>(size);
+        }
+#endif
+        else
+        {
+            FatalErrorInFunction << arch << " architecture is not supported."
+                << exit(FatalError);
+        }
+    }
+#ifdef have_umpire
+    else if (type == "umpireMemoryPool")
+    {
+        if (arch == "cpu")
+        {
+            instance = new umpireMemoryPool<cpuMemoryExecutor>(size);
+        }
+#ifdef have_cuda
+        else if (arch == "cuda")
+        {
+            instance = new umpireMemoryPool<cudaMemoryExecutor>(size);
+        }
+#elif have_hip
+        else if (arch == "hip")
+        {
+            instance = new umpireMemoryPool<hipMemoryExecutor>(size);
+        }
+#endif
+        else
+        {
+            FatalErrorInFunction << arch << " architecture is not supported."
+                << exit(FatalError);
+        }
+    }
+#endif
+    else
+    {
+        FatalErrorInFunction
             << type << " does not exist. "
             << "Please use a different memory pool." << nl
             << abort(FatalError);
-        }
     }
-
     return instance;
 }
 
-Foam::MemoryPool* Foam::MemoryPool::getInstance()
-{
-    if (!instance)
-    {
-       FatalErrorInFunction
-        << "no instance of memory pool initialized" << nl
-        << abort(FatalError);
-    }
-
-    return instance;
-}
 
 // ************************************************************************* //

@@ -33,13 +33,12 @@ Description
     See https://github.com/LLNL/Umpire
 
 SourceFiles
-    umpireMemoryPool.H
     umpireMemoryPool.C
 
 \* ---------------------------------------------------------------------------*/
 
-#ifndef umpire_Memory_Pool_Executor_H
-#define umpire_Memory_Pool_Executor_H
+#ifndef Foam_umpire_Memory_Pool_Executor_H
+#define Foam_umpire_Memory_Pool_Executor_H
 
 #include <iostream>
 #include "MemoryPool.H"
@@ -57,7 +56,9 @@ namespace Foam
                           Class umpireMemoryPool Declaration
 \*---------------------------------------------------------------------------*/
 
-class umpireMemoryPool:
+template<class T>
+class umpireMemoryPool
+:
     public MemoryPool
 {
 
@@ -81,6 +82,9 @@ private:
 
     // Private constructor to prevent instancing
     umpireMemoryPool(const uint64_t size);
+
+    //- typedef for the memory executor backend
+    typedef T foamMemoryExecutor;
 
 public:
 
@@ -212,7 +216,9 @@ public:
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// inline member functions
+#ifdef NoRepository
+    #include "umpireMemoryPool.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

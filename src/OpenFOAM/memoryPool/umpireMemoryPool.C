@@ -30,17 +30,26 @@ License
 #include <cstring>
 #include "memoryExecutors.H"
 #include "memCopyKind.H"
-#include "umpireMemoryPool.H"
 #include "error.H"
+
+
+// * * * * * * * * * * * * * Static Member Data  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(umpireMemoryPool,  0);
+#ifdef have_cuda
+    defineTemplateTypeNameAndDebug(umpireMemoryPool<cudaMemoryExecutor>, 0);
+#elif have_hip
+    defineTemplateTypeNameAndDebug(umpireMemoryPool<hipMemoryExecutor>, 0);
+#endif
+    defineTemplateTypeNameAndDebug(umpireMemoryPool<cpuMemoryExecutor>, 0);
 }
+
 
 // * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * * //
 
-Foam::umpireMemoryPool::umpireMemoryPool(const uint64_t size):
+template<class T>
+Foam::umpireMemoryPool<T>::umpireMemoryPool(const uint64_t size):
     Foam::MemoryPool::MemoryPool(),
     rm_(umpire::ResourceManager::getInstance()),
     inspector_()
@@ -73,14 +82,18 @@ Foam::umpireMemoryPool::umpireMemoryPool(const uint64_t size):
     );
 };
 
+
 // * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * * //
 
-Foam::umpireMemoryPool::~umpireMemoryPool()
+template<class T>
+Foam::umpireMemoryPool<T>::~umpireMemoryPool()
 {};
+
 
 // * * * * * * * * * * * * * Public Member Functions  * * * * * * * * * * * //
 
-void* Foam::umpireMemoryPool::allocate(uint64_t sizeInBytes)
+template<class T>
+void* Foam::umpireMemoryPool<T>::allocate(uint64_t sizeInBytes)
 {
     if (!sizeInBytes)
     {
@@ -97,7 +110,9 @@ void* Foam::umpireMemoryPool::allocate(uint64_t sizeInBytes)
     return poolPtr;
 };
 
-void Foam::umpireMemoryPool::free(void* ptr)
+
+template<class T>
+void Foam::umpireMemoryPool<T>::free(void* ptr)
 {
     //if ptr is null do nothing
     if (ptr == nullptr) return;
@@ -108,7 +123,9 @@ void Foam::umpireMemoryPool::free(void* ptr)
     allocator_.deallocate(ptr);
 };
 
-uint64_t Foam::umpireMemoryPool::arraySizeInBytes(void* poolPtr)
+
+template<class T>
+uint64_t Foam::umpireMemoryPool<T>::arraySizeInBytes(void* poolPtr)
 {
     //if ptr is null do nothing
     if (poolPtr == nullptr) return 0;
@@ -119,7 +136,9 @@ uint64_t Foam::umpireMemoryPool::arraySizeInBytes(void* poolPtr)
     return record->size;
 };
 
-void Foam::umpireMemoryPool::copyIn
+
+template<class T>
+void Foam::umpireMemoryPool<T>::copyIn
 (
     void* poolPtr,
     void* ptr,
@@ -152,7 +171,9 @@ void Foam::umpireMemoryPool::copyIn
     inspector_.deregisterAllocation(ptr, st_);
 };
 
-void Foam::umpireMemoryPool::copyOut
+
+template<class T>
+void Foam::umpireMemoryPool<T>::copyOut
 (
     void* poolPtr,
     void* ptr,
@@ -184,7 +205,9 @@ void Foam::umpireMemoryPool::copyOut
     inspector_.deregisterAllocation(ptr, st_);
 };
 
-void Foam::umpireMemoryPool::memSet
+
+template<class T>
+void Foam::umpireMemoryPool<T>::memSet
 (
     void* poolPtr,
     const void* value,
@@ -215,7 +238,9 @@ void Foam::umpireMemoryPool::memSet
     foamMemoryExecutor::memSet(poolPtr,nElementsInBytes,value,sizeOfValue);
 };
 
-void Foam::umpireMemoryPool::memSetScalarOne
+
+template<class T>
+void Foam::umpireMemoryPool<T>::memSetScalarOne
 (
     void* poolPtr,
     uint64_t nElementsInBytes
@@ -244,7 +269,9 @@ void Foam::umpireMemoryPool::memSetScalarOne
     foamMemoryExecutor::memSetScalarOne(poolPtr,nElementsInBytes);
 };
 
-void Foam::umpireMemoryPool::memSet
+
+template<class T>
+void Foam::umpireMemoryPool<T>::memSet
 (
     void* poolPtr,
     const int value,
@@ -274,7 +301,9 @@ void Foam::umpireMemoryPool::memSet
     foamMemoryExecutor::memSet(poolPtr,nElementsInBytes,value);
 };
 
-void Foam::umpireMemoryPool::memCopy
+
+template<class T>
+void Foam::umpireMemoryPool<T>::memCopy
 (
     void* tgtPtr,
     void* srcPtr,
@@ -313,5 +342,6 @@ void Foam::umpireMemoryPool::memCopy
 
     rm_.copy(tgtPtr,srcPtr,nElementsInBytes);
 }
+
 
 // ************************************************************************* //

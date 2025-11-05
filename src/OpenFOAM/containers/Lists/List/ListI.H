@@ -39,7 +39,10 @@ inline void Foam::List<T>::doAlloc()
         {
             this->v_ = reinterpret_cast<T*>
             (
-                MemoryPool::getInstance()->allocate(this->size_*sizeof(T))
+                MemoryPoolManager::getMemoryPoolInstance()->allocate
+                (
+                    this->size_*sizeof(T)
+                )
             );
         }
         else
@@ -61,7 +64,7 @@ inline void Foam::List<T>::reAlloc(const label len)
     }
 }
 
-//TODO memoryPool
+
 template<class T>
 template<class ListType>
 inline void Foam::List<T>::copyList(const ListType& list)
@@ -79,7 +82,7 @@ inline void Foam::List<T>::copyList(const ListType& list)
     }
 }
 
-//TODO memoryPool
+
 template<class T>
 template<class ListType, class ListIndices>
 inline void Foam::List<T>::copyList
@@ -151,7 +154,10 @@ inline void Foam::List<T>::clear()
     {
         if (this->usePool_)
         {
-            MemoryPool::getInstance()->free((void*)this->v_);
+            MemoryPoolManager::getMemoryPoolInstance()->free
+            (
+                (void*)this->v_
+            );
         }
         else
         {

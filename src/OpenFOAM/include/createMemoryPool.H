@@ -33,7 +33,23 @@ Description
 const word pool = args.getOrDefault<word>("pool", "dummyMemoryPool");
 const scalar poolSize = args.getOrDefault<scalar>("poolSize", 0);
 
-Info << "Create " << pool <<"\n " << endl;
-MemoryPool* memPool = MemoryPool::New(pool, poolSize*1024*1024*1024ul);
+#ifdef have_cuda
+const word defaultArch = "cuda";
+#elif have_hip
+const word defaultArch = "hip";
+#else
+const word defaultArch = "cpu";
+#endif
+
+const word arch = args.getOrDefault<word>("arch", defaultArch);
+
+MemoryPoolManager& memPoolManager = MemoryPoolManager::New
+(
+    arch,
+    pool, 
+    poolSize
+);
+
+MemoryPool* memPool = memPoolManager.getMemoryPoolInstance();
 
 // ************************************************************************* //

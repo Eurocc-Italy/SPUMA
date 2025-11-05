@@ -47,8 +47,8 @@ SourceFiles
 #include "autoPtr.H"
 #include "UList.H"
 #include "SLListFwd.H"
+#include "MemoryPoolManager.H"
 
-#include "MemoryPool.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam

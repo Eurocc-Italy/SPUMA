@@ -33,13 +33,12 @@ Description
     strategy.
 
 SourceFiles
-    dummyMemoryPool.H
     dummyMemoryPool.C
 
 \* ---------------------------------------------------------------------------*/
 
-#ifndef dummy_Memory_Pool_Executor_H
-#define dummy_Memory_Pool_Executor_H
+#ifndef Foam_dummy_Memory_Pool_Executor_H
+#define Foam_dummy_Memory_Pool_Executor_H
 
 #include <iostream>
 #include "MemoryPool.H"
@@ -53,7 +52,9 @@ namespace Foam
                           Class dummyMemoryPool Declaration
 \*---------------------------------------------------------------------------*/
 
-class dummyMemoryPool:
+template <class T>
+class dummyMemoryPool
+:
     public MemoryPool
 {
 
@@ -61,6 +62,9 @@ private:
 
     // Private constructor to prevent instancing
     dummyMemoryPool(const uint64_t size = 0);
+
+    //- typedef for the memory executor backend
+    typedef T foamMemoryExecutor;
 
 public:
 
@@ -168,7 +172,8 @@ public:
 
 // inline member functions
 
-inline bool Foam::dummyMemoryPool::isValid(void* poolPtr)
+template <class T>
+inline bool Foam::dummyMemoryPool<T>::isValid(void* poolPtr)
 {
     //case when poolPtr is null
     if ( !poolPtr ) return false;
@@ -182,7 +187,9 @@ inline bool Foam::dummyMemoryPool::isValid(void* poolPtr)
     return valid;
 }
 
-inline bool Foam::dummyMemoryPool::isInBlockRange(void* ptr)
+
+template <class T>
+inline bool Foam::dummyMemoryPool<T>::isInBlockRange(void* ptr)
 {
     // case when ptr is null
     if (!ptr) return false;
@@ -204,6 +211,13 @@ inline bool Foam::dummyMemoryPool::isInBlockRange(void* ptr)
 
     return inRange;
 }
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+    #include "dummyMemoryPool.C"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

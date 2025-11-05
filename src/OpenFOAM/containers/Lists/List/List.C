@@ -55,13 +55,17 @@ void Foam::List<T>::doResize(const label len)
             if (this->usePool_)
             {
                 this->v_ = static_cast<T*>
-                    (
-                        MemoryPool::getInstance()->allocate(len*sizeof(T))
-                    );
+                (
+                    MemoryPoolManager::getMemoryPoolInstance()->allocate(len*sizeof(T))
+                );
 
-                MemoryPool::getInstance()->memCopy(this->v_,old,overlap*sizeof(T));
-
-                MemoryPool::getInstance()->free(old);
+                MemoryPoolManager::getMemoryPoolInstance()->memCopy
+                (
+                    this->v_,
+                    old,
+                    overlap*sizeof(T)
+                );
+                MemoryPoolManager::getMemoryPoolInstance()->free(old);
             }
             else
             {
@@ -73,33 +77,36 @@ void Foam::List<T>::doResize(const label len)
                 std::move(old, (old + overlap), this->v_);
 
                 delete[] old;
-            };
+            }
         }
         else
         {
             // No overlapping content
             if (this->usePool_)
             {
-                MemoryPool::getInstance()->free(this->v_);
+                MemoryPoolManager::getMemoryPoolInstance()->free(this->v_);
             }
             else
             {
                 delete[] this->v_;
-            };
+            }
 
             this->size_ = len;
 
             if (this->usePool_)
             {
                 this->v_ = static_cast<T*>
+                (
+                    MemoryPoolManager::getMemoryPoolInstance()->allocate
                     (
-                        MemoryPool::getInstance()->allocate(len*sizeof(T))
-                    );
+                        len*sizeof(T)
+                    )
+                );
             }
             else
             {
                 this->v_ = new T[len];
-            };
+            }
         }
     }
     else
@@ -351,7 +358,7 @@ Foam::List<T>::~List()
     {
         if(this->usePool_)
         {
-            MemoryPool::getInstance()->free(this->v_);
+            MemoryPoolManager::getMemoryPoolInstance()->free(this->v_);
 
         }
         else
@@ -397,7 +404,12 @@ void Foam::List<T>::transfer(List<T>& list)
     if (this->usePool() && !list.usePool())
     {
         doAlloc();
-        MemoryPool::getInstance()->copyIn(this->v_,(void*)list.begin(),this->size_*sizeof(T));
+        MemoryPoolManager::getMemoryPoolInstance()->copyIn
+        (
+            this->v_,
+            (void*)list.begin(),
+            this->size_*sizeof(T)
+        );
         list.clear();
     }
     else

@@ -1,7 +1,0 @@
-
-UMPIRE_SOURCE =
-
-ifneq (,$(findstring true,$(have_umpire)))
-    UMPIRE_SOURCE += \
-        memoryPool/umpireMemoryPool.C
-endif

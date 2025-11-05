@@ -40,7 +40,7 @@ SourceFiles
 #ifndef Foam_Mutex_H
 #define Foam_Mutex_H
 
-#include "MemoryPool.H"
+#include "MemoryPoolManager.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -55,13 +55,21 @@ struct Mutex
 {
     Mutex()
     {
-        mutex_ = static_cast<int*>(MemoryPool::getInstance()->allocate(sizeof(int)));
-        Foam::MemoryPool::getInstance()->memSet(mutex_, 0, sizeof(int));
+        mutex_ = static_cast<int*>
+        (
+            MemoryPoolManager::getMemoryPoolInstance()->allocate(sizeof(int))
+	);
+        Foam::MemoryPoolManager::getMemoryPoolInstance()->memSet
+        (
+            mutex_, 
+            0, 
+            sizeof(int)
+        );
     }
 
     ~Mutex()
     {
-        MemoryPool::getInstance()->free(mutex_);
+        MemoryPoolManager::getMemoryPoolInstance()->free(mutex_);
     }
 
     __host__ __device__ inline int* getMutex()

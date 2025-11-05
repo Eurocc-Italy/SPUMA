@@ -29,17 +29,26 @@ License
 
 #include <cstring>
 #include "memoryExecutors.H"
-#include "fixedSizeMemoryPool.H"
 #include "error.H"
+
+
+// * * * * * * * * * * * * * Static Member Data  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(fixedSizeMemoryPool, 0);
+#ifdef have_cuda
+    defineTemplateTypeNameAndDebug(fixedSizeMemoryPool<cudaMemoryExecutor>, 0);
+#elif have_hip
+    defineTemplateTypeNameAndDebug(fixedSizeMemoryPool<hipMemoryExecutor>, 0);
+#endif    
+    defineTemplateTypeNameAndDebug(fixedSizeMemoryPool<cpuMemoryExecutor>, 0);
 }
+
 
 // * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * * //
 
-Foam::fixedSizeMemoryPool::fixedSizeMemoryPool(const uint64_t size):
+template<class T>
+Foam::fixedSizeMemoryPool<T>::fixedSizeMemoryPool(const uint64_t size):
     Foam::MemoryPool::MemoryPool(),
     v_(nullptr)
 {
@@ -60,17 +69,21 @@ Foam::fixedSizeMemoryPool::fixedSizeMemoryPool(const uint64_t size):
     this->unallocatedSize_ = this->size_;
 };
 
+
 // * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * * //
 
-Foam::fixedSizeMemoryPool::~fixedSizeMemoryPool()
+template<class T>
+Foam::fixedSizeMemoryPool<T>::~fixedSizeMemoryPool()
 {
     if (this->v_)
         foamMemoryExecutor::clear(this->v_);
 };
 
+
 // * * * * * * * * * * * * * Public Member Functions  * * * * * * * * * * * //
 
-void* Foam::fixedSizeMemoryPool::allocate(uint64_t size)
+template<class T>
+void* Foam::fixedSizeMemoryPool<T>::allocate(uint64_t size)
 {
     uint64_t sizeAvailable;
 
@@ -130,7 +143,9 @@ void* Foam::fixedSizeMemoryPool::allocate(uint64_t size)
     return nullptr; //avoid return warning
 };
 
-void Foam::fixedSizeMemoryPool::free(void* ptr)
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::free(void* ptr)
 {
     // if ptr is null do nothing
     if (ptr == nullptr) return;
@@ -191,7 +206,9 @@ void Foam::fixedSizeMemoryPool::free(void* ptr)
     }
 };
 
-uint64_t Foam::fixedSizeMemoryPool::arraySizeInBytes(void* poolPtr)
+
+template<class T>
+uint64_t Foam::fixedSizeMemoryPool<T>::arraySizeInBytes(void* poolPtr)
 {
     //if ptr is null do nothing
     if (poolPtr == nullptr) return 0;
@@ -209,7 +226,9 @@ uint64_t Foam::fixedSizeMemoryPool::arraySizeInBytes(void* poolPtr)
     return mapElement->second;
 };
 
-void Foam::fixedSizeMemoryPool::copyIn
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::copyIn
 (
     void* poolPtr,
     void* ptr,
@@ -252,7 +271,9 @@ void Foam::fixedSizeMemoryPool::copyIn
     );
 };
 
-void Foam::fixedSizeMemoryPool::copyOut
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::copyOut
 (
     void* poolPtr,
     void* ptr,
@@ -295,7 +316,9 @@ void Foam::fixedSizeMemoryPool::copyOut
     );
 };
 
-void Foam::fixedSizeMemoryPool::memSet
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::memSet
 (
     void* poolPtr,
     const void* value,
@@ -355,7 +378,9 @@ void Foam::fixedSizeMemoryPool::memSet
     );
 }
 
-void Foam::fixedSizeMemoryPool::memSetScalarOne
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::memSetScalarOne
 (
     void* poolPtr,
     uint64_t nElementsInBytes
@@ -407,7 +432,9 @@ void Foam::fixedSizeMemoryPool::memSetScalarOne
     foamMemoryExecutor::memSetScalarOne(poolPtr, nElementsInBytes);
 }
 
-void Foam::fixedSizeMemoryPool::memSet
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::memSet
 (
     void* poolPtr,
     const int value,
@@ -459,7 +486,9 @@ void Foam::fixedSizeMemoryPool::memSet
     foamMemoryExecutor::memSet(poolPtr, nElementsInBytes, value);
 }
 
-void Foam::fixedSizeMemoryPool::memCopy
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::memCopy
 (
     void* tgtPtr,
     void* srcPtr,
@@ -554,7 +583,9 @@ void Foam::fixedSizeMemoryPool::memCopy
     );
 }
 
-void Foam::fixedSizeMemoryPool::showAllocated(bool relative)
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::showAllocated(bool relative)
 {
     uint64_t offset = 0;
 
@@ -568,7 +599,9 @@ void Foam::fixedSizeMemoryPool::showAllocated(bool relative)
             << " allocated block of size " << ii->second << " bytes." << nl;
 }
 
-void Foam::fixedSizeMemoryPool::showUnallocated(bool relative)
+
+template<class T>
+void Foam::fixedSizeMemoryPool<T>::showUnallocated(bool relative)
 {
     uint64_t offset = 0;
 
@@ -581,5 +614,6 @@ void Foam::fixedSizeMemoryPool::showUnallocated(bool relative)
             << "At address: " << std::to_string(reinterpret_cast<uint64_t>(ii->first) - offset)
             << " allocated block of size " << ii->second << " bytes." << nl;
 };
+
 
 // ************************************************************************* //

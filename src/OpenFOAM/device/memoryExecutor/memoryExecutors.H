@@ -48,23 +48,6 @@ SourceFiles
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-namespace Foam
-{
-
-#ifdef have_cuda
-    typedef cudaMemoryExecutor foamMemoryExecutor;
-#elif have_hip
-    typedef hipMemoryExecutor foamMemoryExecutor;
-#else
-    typedef cpuMemoryExecutor foamMemoryExecutor;
-#endif
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-} // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
 #endif
 
 // ************************************************************************* //

@@ -36,7 +36,6 @@ SourceFiles
 #ifndef Foam_hipAtomicMinMax_hpp
 #define Foam_hipAtomicMinMax_hpp
 
-#include "MemoryPool.H"
 #include "hipError.hpp"
 #include <hip/hip_runtime.h>
 

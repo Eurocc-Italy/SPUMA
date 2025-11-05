@@ -285,10 +285,13 @@ void Foam::cudaExecutor::_backendReductionSum
 
     resultT* dPtrResult = static_cast<resultT*>
     (
-        MemoryPool::getInstance()->allocate(sizeof(resultT))
+        MemoryPoolManager::getMemoryPoolInstance()->allocate
+        (
+            sizeof(resultT)
+        )
     );
 
-    MemoryPool::getInstance()->memSet
+    MemoryPoolManager::getMemoryPoolInstance()->memSet
     (
         (void*) dPtrResult,
         (const void*) result,
@@ -327,15 +330,16 @@ void Foam::cudaExecutor::_backendReductionSum
     cudaDeviceSynchronize();
     CHECK_LAST_CUDA_ERROR();
 
-    MemoryPool::getInstance()->copyOut
+    MemoryPoolManager::getMemoryPoolInstance()->copyOut
     (
         (void*) dPtrResult,
         (void*) result,
         sizeof(resultT)
     );
 
-    MemoryPool::getInstance()->free(dPtrResult);
+    MemoryPoolManager::getMemoryPoolInstance()->free(dPtrResult);
 };
+
 
 template <typename F, typename Op, typename resultT>
 void Foam::cudaExecutor::_backendReductionCompare
@@ -350,10 +354,13 @@ void Foam::cudaExecutor::_backendReductionCompare
 
     resultT* dPtrResult = static_cast<resultT*>
     (
-        MemoryPool::getInstance()->allocate(sizeof(resultT))
+        MemoryPoolManager::getMemoryPoolInstance()->allocate
+        (
+            sizeof(resultT)
+        )
     );
 
-    MemoryPool::getInstance()->memSet
+    MemoryPoolManager::getMemoryPoolInstance()->memSet
     (
         (void*) dPtrResult,
         (const void*) result,
@@ -394,14 +401,14 @@ void Foam::cudaExecutor::_backendReductionCompare
     cudaDeviceSynchronize();
     CHECK_LAST_CUDA_ERROR();
 
-    MemoryPool::getInstance()->copyOut
+    MemoryPoolManager::getMemoryPoolInstance()->copyOut
     (
         (void*) dPtrResult,
         (void*) result,
         sizeof(resultT)
     );
 
-    MemoryPool::getInstance()->free(dPtrResult);
+    MemoryPoolManager::getMemoryPoolInstance()->free(dPtrResult);
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

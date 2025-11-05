@@ -30,7 +30,7 @@ License
 #include "UList.H"
 #include "contiguous.H"
 #include "labelRange.H"
-#include "MemoryPool.H"
+#include "MemoryPoolManager.H"
 
 #include <random>
 
@@ -102,7 +102,7 @@ void Foam::UList<T>::swapLast(const label i)
     }
 }
 
-//TODO memory pool
+
 template<class T>
 void Foam::UList<T>::deepCopy(const UList<T>& list)
 {
@@ -120,11 +120,21 @@ void Foam::UList<T>::deepCopy(const UList<T>& list)
         // - std::execution::unsequenced_policy
         if (list.usePool() && this->usePool_) //ADD case were the src list is not on the pool?
         {
-            MemoryPool::getInstance()->memCopy(this->v_,(void*)list.begin(),this->size_*sizeof(T));
+            MemoryPoolManager::getMemoryPoolInstance()->memCopy
+            (
+                this->v_,
+                (void*)list.begin(),
+                this->size_*sizeof(T)
+            );
         }
         else if (this->usePool_ && !list.usePool())
         {
-            MemoryPool::getInstance()->copyIn(this->v_,(void*)list.begin(),this->size_*sizeof(T));
+            MemoryPoolManager::getMemoryPoolInstance()->copyIn
+            (
+                this->v_,
+                (void*)list.begin(),
+                this->size_*sizeof(T)
+            );
         }
         else
         {

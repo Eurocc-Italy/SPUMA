@@ -36,25 +36,23 @@ Description
     allocation (and deallocation) with constant execution time
 
 SourceFiles
-    MemoryPool.H
     MemoryPool.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef Memory_Pool_H
-#define Memory_Pool_H
+#ifndef Foam_Memory_Pool_H
+#define Foam_Memory_Pool_H
 
 #include "label.H"
 #include "word.H"
 #include "scalar.H"
 #include "typeInfo.H"
-
 #include <map>
 
 //- macro to raise poolptr errors
 #define raisePoolValidError(poolPtr)\
     FatalErrorInFunction\
-        << "MEMPOOL: pointer " << std::to_string(reinterpret_cast<uint64_t>(poolPtr)) \
+        << "MEMPOOL: pointer " << std::to_string(reinterpret_cast<uint64_t>(poolPtr))\
         << " is not valid" << abort(FatalError);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -71,148 +69,173 @@ class MemoryPool;
 
 class MemoryPool
 {
-private:
-    // Unique instance of this class
-    static MemoryPool* instance;
-
 protected:
 
-    uint64_t size_;
-    uint64_t allocatedSize_;
-    uint64_t unallocatedSize_;
-    uint64_t maxOccupancy_;
+    // Private data
 
-    typedef std::map<char*, uint64_t> blockList;
-    typedef std::pair<char*, uint64_t> blockPair;
+        //- Size of the pool
+        uint64_t size_;
+    
+        //- The size of the allocated memory
+        uint64_t allocatedSize_;
+    
+        //- The size of the unallocated memory
+        uint64_t unallocatedSize_;
+    
+        //- Max occupancy reached during the simulation
+        uint64_t maxOccupancy_;
 
-    blockList unusedBlockList_;
-    blockList usedBlockList_;
+        //- Useful typedefs
+        typedef std::map<char*, uint64_t> blockList;
+        typedef std::pair<char*, uint64_t> blockPair;
+
+        //- List of unused memory blocks 
+        // (represented in memory as a map)
+        blockList unusedBlockList_;
+   
+        //- List of used memory blocks
+        // (represented in memory as a map)
+        blockList usedBlockList_;
 
 public:
     // Static Data
-    TypeName("MemoryPool");
+    
+        // Typename
+        TypeName("MemoryPool");
 
-    // Constructor
-    MemoryPool():
-        size_(0),
-        allocatedSize_(0),
-        unallocatedSize_(0),
-        maxOccupancy_(0)
-    {};
 
-    MemoryPool(const dictionary& dict);
+    // Constructors
+    
+        //- Default constructor
+        MemoryPool();
 
-    // No copy constructor
-    MemoryPool(MemoryPool &other) = delete;
+        //- Memory pool constructor from dictionary
+        MemoryPool(const dictionary& dict);
 
-    // Selectors
-    static MemoryPool* New
-    (
-        const word& type,
-        const uint64_t size
-    );
+        //- No copy constructor
+        MemoryPool(MemoryPool &other) = delete;
 
-    // Destructor
+
+    //- Destructor
     virtual ~MemoryPool();
 
-    // new function
-    virtual void* allocate(uint64_t size) = 0;
 
-    // free function
-    virtual void free(void* ptr) = 0;
+    // Static Member Functions
 
-    // check if pool pointer is valid
-    virtual inline bool isValid(void* poolPtr) = 0;
+        //- Create a new memory pool of type @type
+        // and size @size
+        static MemoryPool* New
+        (
+            const word arch,
+            const word type,
+            const uint64_t size
+        );
 
-    // check if ptr is in allocated blocks
-    virtual inline bool isInBlockRange(void* ptr) = 0;
 
-    // Returns size of array (in bytes if type not specified)
-    virtual uint64_t arraySizeInBytes(void* poolPtr) = 0;
+    // Member Functions
 
-    // Copies data in pool
-    virtual void copyIn
-    (
-        void* poolPtr,
-        void* ptr,
-        uint64_t nElementsInBytes
-    ) = 0;
+        //- Allocate a new block of memory of size @size 
+        virtual void* allocate(uint64_t size) = 0;
 
-    // Copies data from pool
-    virtual void copyOut
-    (
-        void* poolPtr,
-        void* ptr,
-        uint64_t nElementsInBytes
-    ) = 0;
+        //- Free the block of memory associated to @ptr
+        virtual void free(void* ptr) = 0;
 
-    // Set the memory to a value for each byte of specified memory
-    virtual void memSet
-    (
-        void* poolPtr,
-        const void* value,
-        size_t sizeOfValue,
-        uint64_t nElementsInBytes
-    ) = 0;
+        //- Check if pool pointer @poolPtr is valid
+        virtual inline bool isValid(void* poolPtr) = 0;
 
-    // Set the memory to a value of one fo a scalar type for each byte of specified memory
-    virtual void memSetScalarOne
-    (
-        void* poolPtr,
-        uint64_t nElementsInBytes
-    ) = 0;
+        //- Check if @ptr is inside a block
+        virtual inline bool isInBlockRange(void* ptr) = 0;
 
-    // Set the memory to an int value using built-in memset function
-    virtual void memSet
-    (
-        void* poolPtr,
-        const int value,
-        uint64_t nElementsInBytes
-    ) = 0;
+        //- Return the size of the array associated to @poolPtr 
+        // (in bytes if type is not specified)
+        virtual uint64_t arraySizeInBytes(void* poolPtr) = 0;
 
-    // Copy from one block of the memory pool to another
-    virtual void memCopy
-    (
-        void* tgtPtr,
-        void* srcPtr,
-        uint64_t nElementsInBytes
-    ) = 0;
+        //- Copy data in the memory pool
+        virtual void copyIn
+        (
+            void* poolPtr,
+            void* ptr,
+            uint64_t nElementsInBytes
+        ) = 0;
 
-    // Returns pool size
-    virtual uint64_t size() const = 0;
+        //- Copy data from the memory pool
+        virtual void copyOut
+        (
+            void* poolPtr,
+            void* ptr,
+            uint64_t nElementsInBytes
+        ) = 0;
 
-    // Returns allocated size
-    virtual uint64_t allocatedSize() const = 0;
+        //- Set the memory to the scalar value @value 
+        // for each byte of specified memory
+        virtual void memSet
+        (
+            void* poolPtr,
+            const void* value,
+            size_t sizeOfValue,
+            uint64_t nElementsInBytes
+        ) = 0;
 
-    // Returns allocated size
-    virtual uint64_t unallocatedSize() const = 0;
+        //- Set the memory to a value of one 
+        // for each byte of specified memory
+        virtual void memSetScalarOne
+        (
+            void* poolPtr,
+            uint64_t nElementsInBytes
+        ) = 0;
 
-    // Returns occupancy rate (percent)
-    virtual scalar occupancy() const
-    {
-        return 100 * scalar(this->allocatedSize()) / scalar(this->size());
-    }
+        //- Set the memory to the integer value @value 
+        // using built-in memset function
+        virtual void memSet
+        (
+            void* poolPtr,
+            const int value,
+            uint64_t nElementsInBytes
+        ) = 0;
 
-    // Returns max occupancy reached
-    virtual uint64_t maxOccupancy() const
-    {
-        return maxOccupancy_;
-    }
+        //- Copy from one block of the memory pool to another
+        virtual void memCopy
+        (
+            void* tgtPtr,
+            void* srcPtr,
+            uint64_t nElementsInBytes
+        ) = 0;
 
-    // Prints list of allocated blocks
-    virtual void showAllocated(bool relative = false) = 0;
+    // Pool status
 
-    // Prints list of unallocated blocks
-    virtual void showUnallocated(bool relative = false) = 0;
+        //- Return the pool size
+        virtual uint64_t size() const = 0;
 
-    /* Static access method. */
-    static MemoryPool* getInstance();
+        //- Return the allocated size
+        virtual uint64_t allocatedSize() const = 0;
 
-    // operators
+        //- Return the unallocated size
+        virtual uint64_t unallocatedSize() const = 0;
 
-    // remove copy assignement operator
-    virtual void operator=(const MemoryPool &) = delete;
+        //- Return the occupancy rate (in percent)
+        virtual scalar occupancy() const
+        {
+            return 100 * scalar(this->allocatedSize()) / scalar(this->size());
+        }
 
+        //- Return the max occupancy reached
+        // during the simulation
+        virtual uint64_t maxOccupancy() const
+        {
+            return maxOccupancy_;
+        }
+
+        //- Print the list of allocated blocks
+        virtual void showAllocated(bool relative = false) = 0;
+
+        //- Print the list of unallocated blocks
+        virtual void showUnallocated(bool relative = false) = 0;
+
+
+    // Member Operators
+
+        //- Remove the copy assignement operator
+        virtual void operator=(const MemoryPool &) = delete;
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

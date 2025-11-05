@@ -29,32 +29,45 @@ License
 
 #include <cstring>
 #include "memoryExecutors.H"
-#include "dummyMemoryPool.H"
 #include "error.H"
+
+
+// * * * * * * * * * * * * * Static Member Data  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
-    defineTypeNameAndDebug(dummyMemoryPool, 0);
+#ifdef have_cuda
+    defineTemplateTypeNameAndDebug(dummyMemoryPool<cudaMemoryExecutor>, 0);
+#elif have_hip
+    defineTemplateTypeNameAndDebug(dummyMemoryPool<hipMemoryExecutor>, 0);
+#endif
+    defineTemplateTypeNameAndDebug(dummyMemoryPool<cpuMemoryExecutor>, 0);
 }
+
 
 // * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * * //
 
-Foam::dummyMemoryPool::dummyMemoryPool(const uint64_t size):
+template <class T>
+Foam::dummyMemoryPool<T>::dummyMemoryPool(const uint64_t size):
     Foam::MemoryPool::MemoryPool()
 {
     DebugInFunction << "MEMPOOL: using dummy memory Pool " << nl;
 };
 
+
 // * * * * * * * * * * * * * * * Destructors  * * * * * * * * * * * * * * * //
 
-Foam::dummyMemoryPool::~dummyMemoryPool()
+template <class T>
+Foam::dummyMemoryPool<T>::~dummyMemoryPool()
 {
     DebugInFunction << "MEMPOOL: destroy dummy memory Pool" << nl;
 };
 
+
 // * * * * * * * * * * * * * Public Member Functions  * * * * * * * * * * * //
 
-void* Foam::dummyMemoryPool::allocate(uint64_t size)
+template <class T>
+void* Foam::dummyMemoryPool<T>::allocate(uint64_t size)
 {
     if (!size)
     {
@@ -73,8 +86,9 @@ void* Foam::dummyMemoryPool::allocate(uint64_t size)
     return head;
 };
 
-// free function
-void Foam::dummyMemoryPool::free(void* ptr)
+
+template <class T>
+void Foam::dummyMemoryPool<T>::free(void* ptr)
 {
     //if ptr is null do nothing
     if (ptr == nullptr) return;
@@ -106,8 +120,9 @@ void Foam::dummyMemoryPool::free(void* ptr)
     this->usedBlockList_.erase(reinterpret_cast<char*>(ptr));
 };
 
-// Returns size of array (in bytes if type not specified)
-uint64_t Foam::dummyMemoryPool::arraySizeInBytes(void* poolPtr)
+
+template <class T>
+uint64_t Foam::dummyMemoryPool<T>::arraySizeInBytes(void* poolPtr)
 {
     //if ptr is null do nothing
     if (poolPtr == nullptr) return 0;
@@ -126,7 +141,9 @@ uint64_t Foam::dummyMemoryPool::arraySizeInBytes(void* poolPtr)
     return mapElement->second;
 };
 
-void Foam::dummyMemoryPool::copyIn
+
+template <class T>
+void Foam::dummyMemoryPool<T>::copyIn
 (
     void* poolPtr,
     void* ptr,
@@ -169,7 +186,9 @@ void Foam::dummyMemoryPool::copyIn
     );
 };
 
-void Foam::dummyMemoryPool::copyOut
+
+template <class T>
+void Foam::dummyMemoryPool<T>::copyOut
 (
     void* poolPtr,
     void* ptr,
@@ -212,7 +231,9 @@ void Foam::dummyMemoryPool::copyOut
     );
 };
 
-void Foam::dummyMemoryPool::memSet
+
+template <class T>
+void Foam::dummyMemoryPool<T>::memSet
 (
     void* poolPtr,
     const void* value,
@@ -250,6 +271,7 @@ void Foam::dummyMemoryPool::memSet
             }
         }
     }
+
     blockList::iterator mapElement = this->usedBlockList_.find
     (
         reinterpret_cast<char*>(allocatedPoolPtr)
@@ -266,7 +288,9 @@ void Foam::dummyMemoryPool::memSet
     foamMemoryExecutor::memSet(poolPtr, nElementsInBytes, value, sizeOfValue);
 }
 
-void Foam::dummyMemoryPool::memSetScalarOne
+
+template <class T>
+void Foam::dummyMemoryPool<T>::memSetScalarOne
 (
     void* poolPtr,
     uint64_t nElementsInBytes
@@ -301,6 +325,7 @@ void Foam::dummyMemoryPool::memSetScalarOne
             }
         }
     }
+
     blockList::iterator mapElement = this->usedBlockList_.find
     (
         reinterpret_cast<char*>(allocatedPoolPtr)
@@ -317,7 +342,9 @@ void Foam::dummyMemoryPool::memSetScalarOne
     foamMemoryExecutor::memSetScalarOne(poolPtr, nElementsInBytes);
 }
 
-void Foam::dummyMemoryPool::memSet
+
+template <class T>
+void Foam::dummyMemoryPool<T>::memSet
 (
     void* poolPtr,
     const int value,
@@ -371,7 +398,9 @@ void Foam::dummyMemoryPool::memSet
     foamMemoryExecutor::memSet(poolPtr, nElementsInBytes, value);
 }
 
-void Foam::dummyMemoryPool::memCopy
+
+template <class T>
+void Foam::dummyMemoryPool<T>::memCopy
 (
     void* tgtPtr,
     void* srcPtr,
@@ -468,7 +497,9 @@ void Foam::dummyMemoryPool::memCopy
     );
 }
 
-void Foam::dummyMemoryPool::showAllocated(bool relative)
+
+template <class T>
+void Foam::dummyMemoryPool<T>::showAllocated(bool relative)
 {
     for (blockList::iterator ii = this->usedBlockList_.begin();
                              ii != this->usedBlockList_.end(); ii++)
@@ -477,7 +508,9 @@ void Foam::dummyMemoryPool::showAllocated(bool relative)
             << " allocated block of size " << ii->second << " bytes." << nl;
 }
 
-void Foam::dummyMemoryPool::showUnallocated(bool relative)
+
+template <class T>
+void Foam::dummyMemoryPool<T>::showUnallocated(bool relative)
 {
     for (blockList::iterator ii = this->unusedBlockList_.begin();
                              ii != this->unusedBlockList_.end(); ii++)
@@ -485,5 +518,6 @@ void Foam::dummyMemoryPool::showUnallocated(bool relative)
             << "At address: " << std::to_string(reinterpret_cast<uint64_t>(ii->first))
             << " allocated block of size " << ii->second << " bytes." << nl;
 };
+
 
 // ************************************************************************* //
