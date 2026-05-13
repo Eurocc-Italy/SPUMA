@@ -1,6 +1,11 @@
 
 DEVICE_SOURCE =
 
+ifneq (,$(findstring true,$(have_mt)))
+    DEVICE_SOURCE += \
+        device/deviceInit/mtDeviceInit.C
+endif
+
 ifneq (,$(findstring true,$(have_cuda)))
     DEVICE_SOURCE += \
         db/error/cudaError.cu \

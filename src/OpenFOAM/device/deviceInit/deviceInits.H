@@ -36,10 +36,13 @@ SourceFiles
 #define Foam_deviceInits_H
 
 #include "cpuDeviceInit.H"
+
 #ifdef have_cuda
     #include "cudaDeviceInit.cuh"
 #elif have_hip
     #include "hipDeviceInit.hpp"
+#elif have_mt
+    #include "mtDeviceInit.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -51,6 +54,8 @@ namespace Foam
     typedef cudaDeviceInit foamDeviceInit;
 #elif have_hip
     typedef hipDeviceInit foamDeviceInit;
+#elif have_mt
+    typedef mtDeviceInit foamDeviceInit;
 #else
     typedef cpuDeviceInit foamDeviceInit;
 #endif
