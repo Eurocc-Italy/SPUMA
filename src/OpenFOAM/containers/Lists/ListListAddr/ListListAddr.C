@@ -79,7 +79,62 @@ usepool_(ListListOps::subUsePool(listlist,accessOp<T>()))
 
 };
 
+template<typename T>
+template<typename primitiveType>
+Foam::ListListAddr<T>::ListListAddr(const Foam::UList<primitiveType>& list, const labelUList& sizes)
+:
+usepool_(list.usePool())
+{
+    const label N = sizes.size();
+    if (N <= 0)
+    {
+        this->sizes_ = autoPtr<labelList>::New(1,0,poolSwitch(usepool_));
+        this->begins_ = autoPtr<List<iterator_type>>::New(1,nullptr,poolSwitch(usepool_));
+        return;
+    }
+    const label totalSize = sum(sizes);
+    if (totalSize != list.size())
+    {
+        FatalErrorInFunction
+            << "Sizes of inner lists do not match the size of the input list"
+            << abort(FatalError);
+    }
+    
+    this->sizes_ = autoPtr<labelList>::New(sizes);
+    this->begins_ = autoPtr<List<iterator_type>>::New(N,poolSwitch(usepool_));
 
+    auto& sizeRef = sizes_.ref();
+    auto& beginRef = begins_.ref();
+
+    // perform exclusive scan on sizes //TODO prefix sum gpu
+    labelList cumulativeSizes(N, 0);
+    for (label i = 1; i < N; i++)
+    {
+        cumulativeSizes[i] = cumulativeSizes[i-1] + sizes[i-1];
+    };
+
+    if (usepool_)
+    {   
+        foamExecutor exec;
+        auto sizePtr = sizes_.begin();
+        auto beginPtr = beginRef.begin();
+        const auto listPtr = list.cbegin();
+        auto sizesPtr = sizes.cbegin();
+        auto Lambda = [=](label i)
+        {
+            beginPtr[i] = listPtr + cumulativeSizes[i];
+        };
+        exec.parallelFor(Lambda,N);
+    }
+    else
+    {
+        for(label i = 0; i < N; i++)
+        {
+            beginRef[i] = list.cbegin() + cumulativeSizes[i];
+        }
+    }
+
+};
 template<typename T>
 Foam::ListListAddr<T>::ListListAddr(Foam::ListListAddr<T>&& other)
 {

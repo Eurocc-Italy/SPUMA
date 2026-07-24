@@ -77,7 +77,10 @@ public:
             usepool_(false)
         {};
         
-        ListListAddr(const UList<T>& listlist);
+        explicit ListListAddr(const UList<T>& listlist);
+
+        template<typename pType>
+        ListListAddr(const UList<pType>& list, const labelUList& sizes);
         
         ListListAddr(const ListListAddr& other);
 
