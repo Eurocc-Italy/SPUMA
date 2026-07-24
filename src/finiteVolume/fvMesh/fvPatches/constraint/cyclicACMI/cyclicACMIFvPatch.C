@@ -96,7 +96,6 @@ void Foam::cyclicACMIFvPatch::makeWeights(scalarField& w) const
     if (coupled())
     {
         const cyclicACMIFvPatch& nbrPatch = neighbFvPatch();
-        const scalarField deltas(nf() & coupledFvPatch::delta());
 
         // These deltas are of the cyclic part alone - they are
         // not affected by the amount of overlap with the nonOverlapPatch
@@ -110,24 +109,32 @@ void Foam::cyclicACMIFvPatch::makeWeights(scalarField& w) const
 
         const scalar tol = cyclicACMIPolyPatch::tolerance();
 
-
-        forAll(deltas, facei)
+        foamExecutor exec;
+        // const auto deltasPtr = deltas.cbegin();
+        const auto nbrDeltasPtr = nbrDeltas.cbegin();
+        const vectorField& nfBf = nf();
+        const auto nfPtr = nfBf.cbegin();
+        const vectorField& coupledFvPatchDelta = coupledFvPatch::delta();
+        const auto coupledFvPatchDeltaPtr = coupledFvPatchDelta.cbegin();
+        auto wPtr = w.begin();
+        auto Lambda = [=](label facei)
         {
-            scalar di = mag(deltas[facei]);
-            scalar dni = mag(nbrDeltas[facei]);
+            const scalar ddi = mag(nfPtr[facei] & coupledFvPatchDeltaPtr[facei]);
+            const scalar dni = mag(nbrDeltasPtr[facei]);
 
             if (dni < tol)
             {
                 // Avoid zero weights on disconnected faces. This value
                 // will be weighted with the (zero) face area so will not
                 // influence calculations.
-                w[facei] = 1.0;
+                wPtr[facei] = 1.0;
             }
             else
             {
-                w[facei] = dni/(di + dni);
+                wPtr[facei] = dni/(ddi + dni);
             }
-        }
+        };
+        exec.parallelFor(Lambda, w.size());
     }
     else
     {
