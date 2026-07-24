@@ -35,6 +35,9 @@ License
 #include "OFstream.H"
 #include "registerSwitch.H"
 #include "ListOps.H"
+#include "ListListOps.H"
+#include "OFstream.H"
+#include "nvtx3/nvtx3.hpp"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -835,11 +838,16 @@ void Foam::AMIInterpolation::agglomerate
         //srcMagSf.setSize(sourceRestrictAddressing.size(), 0.0);
         srcMagSf.setSize(sourceCoarseSize, 0.0);
 
-        forAll(sourceRestrictAddressing, facei)
+        foamExecutor exec;
+        auto srcMagSfPtr = srcMagSf.begin();
+        const auto sourceRestrictAddressingPtr = sourceRestrictAddressing.cbegin();
+        const auto fineSrcMagSfPtr = fineSrcMagSf.cbegin();
+        auto Lambda = [=](label facei)
         {
-            label coarseFacei = sourceRestrictAddressing[facei];
-            srcMagSf[coarseFacei] += fineSrcMagSf[facei];
-        }
+            label coarseFacei = sourceRestrictAddressingPtr[facei];
+            foamAtomic::AtomicAdd(srcMagSfPtr[coarseFacei], fineSrcMagSfPtr[facei]);
+        };
+        exec.parallelFor(Lambda,sourceRestrictAddressing.size());
     }
 
     labelListList srcAddress(sourceCoarseSize,labelList(poolSwitch(1)),poolSwitch(1));
@@ -1070,9 +1078,10 @@ void Foam::AMIInterpolation::agglomerate
     }
     else
     {
-
+        // Non distribute AMI branch
         //Info << "agglomerate 2 new singleproc" << endl;
-
+       //::nvtx3::scoped_range r{"agglomerate algorithm",::nvtx3::rgb(0, 0, 255)};
+/*
         // TODO
         forAll(fineSrcAddress, facei)
         {
@@ -1104,6 +1113,119 @@ void Foam::AMIInterpolation::agglomerate
                 }
             }
         }
+*/
+
+
+        //labelListList cpuSrcAddress = srcAddress; // cpu copy for debugging
+        //scalarListList cpuSrcWeights = srcWeights; // cpu copy for debugging
+        foamExecutor exec;
+
+        const auto fineSrcAddrSizesPtr = fineSrcAddressAddr.sizes().cbegin();
+        const auto sourceRestrictAddressingPtr = sourceRestrictAddressing.cbegin();
+
+        // max coarse element size
+        labelList upperSizes(sourceCoarseSize, 0, poolSwitch(1));
+        auto upperSizesPtr = upperSizes.begin();
+
+        auto LambdaSize = [=](label facei)
+        {
+            const label coarseFacei = sourceRestrictAddressingPtr[facei];
+            foamAtomic::AtomicAdd(upperSizesPtr[coarseFacei], fineSrcAddrSizesPtr[facei]);
+        };
+        exec.parallelFor(LambdaSize, fineSrcAddressAddr.sizes().size());
+
+        // allocate padded lists
+        forAll(srcAddress, i)
+        {
+            srcAddress[i] = labelList(upperSizes[i], -1,  poolSwitch(1));
+            srcWeights[i] = scalarList(upperSizes[i], 0.0, poolSwitch(1));
+        }
+
+        srcAddressNewAddr.reset(new ListListAddr<labelList>(srcAddress));
+        srcWeightsNewAddr.reset(new ListListAddr<scalarList>(srcWeights));
+
+        labelList slotCount(sourceCoarseSize, 0, poolSwitch(1));
+
+        // fill kernel coarse addressing and weights
+
+        const auto fineSrcAddrBeginsPtr = fineSrcAddressAddr.begins().cbegin();
+        const auto fineSrcWeightsBeginsPtr = fineSrcWeightsAddr.begins().cbegin();
+        const auto fineSrcMagSfPtr = fineSrcMagSf.cbegin();
+        const auto targetRestrictAddressingPtr = targetRestrictAddressing.cbegin();
+
+        label** srcAddrBeginsPtr = const_cast<label**>(srcAddressNewAddr.ref().begins().begin());
+        scalar** srcWeightsBeginsPtr = const_cast<scalar**>(srcWeightsNewAddr.ref().begins().begin());
+        auto slotCountPtr = slotCount.begin();
+        const auto upperSizesCPtr = upperSizes.cbegin();
+
+        auto LambdaFill = [=](label facei)
+        {
+            const label   coarseFacei = sourceRestrictAddressingPtr[facei];
+            const label*  elems       = fineSrcAddrBeginsPtr[facei];
+            const scalar* weights     = fineSrcWeightsBeginsPtr[facei];
+            const scalar  fineArea    = fineSrcMagSfPtr[facei];
+            const label   n           = fineSrcAddrSizesPtr[facei];
+
+            label*  newElems   = srcAddrBeginsPtr[coarseFacei];
+            scalar* newWeights = srcWeightsBeginsPtr[coarseFacei];
+            const label cap    = upperSizesCPtr[coarseFacei];
+
+            for (label i = 0; i < n; ++i)
+            {
+                const label  key     = targetRestrictAddressingPtr[elems[i]];
+                const scalar contrib = fineArea*weights[i];
+
+                // lock-free open-addressing insert (linear probe from 0)
+                label slot = -1;
+                for (label s = 0; s < cap; ++s)
+                {
+                    const label cur = newElems[s];        // monotonic: -1 -> key, never changes back
+                    if (cur == key) { slot = s; break; }  // key already present
+                    if (cur == -1)
+                    {
+                        const label old = foamAtomic::AtomicCAS(newElems[s], -1, key);
+                        if (old == -1)                     // we claimed a fresh slot
+                        {
+                            foamAtomic::AtomicAdd(slotCountPtr[coarseFacei], 1);
+                            slot = s; break;
+                        }
+                        if (old == key) { slot = s; break; } // another thread inserted same key here
+                        // else: slot taken by a different key -> keep probing
+                    }
+                }
+
+                foamAtomic::AtomicAdd(newWeights[slot], contrib);
+            }
+        };
+        exec.parallelFor(LambdaFill, fineSrcAddressAddr.sizes().size());
+
+        // resize lists to actual number of unique coarse elements
+        forAll(srcAddress, i)
+        {
+            srcAddress[i].resize(slotCount[i]);   // occupied slots are a dense prefix [0..slotCount[i])
+            srcWeights[i].resize(slotCount[i]);
+        }
+
+
+        // label diffValue = 0;
+        // forAll(srcAddress, i)
+        // {
+        //     if (srcAddress[i].size() ==0)
+        //     {
+        //         Info<<"coarseSize[" << i <<"] is: "<< coarseSizes[i] <<endl;
+                
+        //     }
+        //     else if (srcAddress[i].size() != cpuSrcAddress[i].size())
+        //     {
+        //         Info<<"srcAddress[" << i <<"] is: "<< srcAddress[i].size() <<endl;
+        //     }
+        //     else
+        //     {
+        //         diffValue += abs(srcAddress[i].size() - cpuSrcAddress[i].size());
+        //     }
+        // };
+        // Info<< "diff:" << diffValue << endl;
+
     }
 
 
