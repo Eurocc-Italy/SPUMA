@@ -1,4 +1,4 @@
-allShearStress
+wallShearStress
 {
     type            wallShearStress;
     libs            ("libfieldFunctionObjects.so");
