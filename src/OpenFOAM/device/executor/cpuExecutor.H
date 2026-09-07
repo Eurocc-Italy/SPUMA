@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -101,6 +101,24 @@ public:
         for (label i = 0; i < size; i++)
         {
             *result = op(lambda(i),*result);
+        }
+    }
+
+    template<typename valueT>
+    void _backendExclusiveSum
+    (
+        valueT* const __restrict__ output,
+        valueT* const __restrict__ input,
+        const label& size
+    )
+    {
+        if (size <= 0) return;
+
+        output[0] = pTraits<valueT>::zero;
+
+        for (label i = 1; i < size; i++)
+        {
+            output[i] = output[i-1] + input[i];
         }
     }
 };

@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -431,6 +431,17 @@ void Foam::hipExecutor::_backendReductionCompare
     Spuma::MemoryPool::getInstance()->free(dPtrResult);
 };
 
+template<typename F, typename resultT>
+void Foam::hipExecutor::_backendExclusiveSum
+(
+    valueT* const __restrict__ output,
+    valueT* const __restrict__ input,
+    const label& size
+);
+{
+    if (size <= 0) return;
+    NotImplemented;
+}
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif

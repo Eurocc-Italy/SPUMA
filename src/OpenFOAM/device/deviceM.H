@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -46,10 +46,12 @@ SourceFiles
     #define FOAM_DEVICE __host__ __device__
     #define FOAM_DEVICE_I __host__ __device__ __forceinline__
     #define FOAM_DEVICE_V __device__
+    #define WARP_SIZE 32
 #else
     #define FOAM_DEVICE
     #define FOAM_DEVICE_I inline
     #define FOAM_DEVICE_V
+    #define WARP_SIZE 
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -74,6 +74,12 @@ public:
     }
 
     template<typename F>
+    void parallelFor(F&& lambda, const label& size)
+    {
+        this->parallelFor(std::move(lambda), size);
+    }
+
+    template<typename F>
     void serialFor(F& lambda, const label& size)
     {
         (static_cast<T*>(this))->_backendSerialFor(lambda, size);
@@ -89,6 +95,12 @@ public:
     void reductionCompare(F& lambda,Op& op, resultT* result, const label& size)
     {
         (static_cast<T*>(this))->_backendReductionCompare(lambda, op, result, size);
+    }
+
+    template<typename valueT>
+    void exclusivePrefixSum(valueT* output, valueT* input, const label& size)
+    {
+        (static_cast<T*>(this))->_backendExclusiveSum(output, input, size);
     }
 
     //operator
