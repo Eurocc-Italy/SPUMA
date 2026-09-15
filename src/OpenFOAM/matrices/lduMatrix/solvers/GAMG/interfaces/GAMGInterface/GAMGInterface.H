@@ -171,7 +171,8 @@ public:
         :
             index_(index),
             coarseInterfaces_(coarseInterfaces),
-            faceCells_(poolSwitch(1))
+            faceCells_(poolSwitch(1)),
+            faceRestrictAddressing_(poolSwitch(1))
         {}
 
 

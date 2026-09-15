@@ -58,7 +58,7 @@ usepool_(ListListOps::subUsePool(listlist,accessOp<T>()))
     if (usepool_)
     {   
         foamExecutor exec;
-        auto sizePtr = sizeRef.begin();
+        label* sizePtr = sizeRef.begin();
         auto beginPtr = beginRef.begin();
         auto listlistPtr = listlist.cbegin();
         auto Lambda = [=](label i)
@@ -83,7 +83,7 @@ template<typename T>
 template<typename primitiveType>
 Foam::ListListAddr<T>::ListListAddr(const Foam::UList<primitiveType>& list, const labelUList& sizes)
 :
-usepool_(list.usePool())
+usepool_(list.usePool() && sizes.usePool())
 {
     const label N = sizes.size();
     if (N <= 0)
@@ -106,28 +106,31 @@ usepool_(list.usePool())
     auto& sizeRef = sizes_.ref();
     auto& beginRef = begins_.ref();
 
-    // perform exclusive scan on sizes //TODO prefix sum gpu
-    labelList cumulativeSizes(N, 0);
-    for (label i = 1; i < N; i++)
-    {
-        cumulativeSizes[i] = cumulativeSizes[i-1] + sizes[i-1];
-    };
+    // perform exclusive scan on sizes
+    labelList cumulativeSizes(N,poolSwitch(usepool_)); // cumulativeSizes[0] = 0
 
     if (usepool_)
     {   
         foamExecutor exec;
-        auto sizePtr = sizes_.begin();
+        auto sizePtr = sizeRef.begin();
+        auto cumulativeSizesPtr = cumulativeSizes.begin();
+        exec.exclusivePrefixSum(cumulativeSizesPtr, sizePtr, N);
         auto beginPtr = beginRef.begin();
         const auto listPtr = list.cbegin();
         auto sizesPtr = sizes.cbegin();
         auto Lambda = [=](label i)
         {
-            beginPtr[i] = listPtr + cumulativeSizes[i];
+            beginPtr[i] = listPtr + cumulativeSizesPtr[i];
         };
         exec.parallelFor(Lambda,N);
     }
     else
     {
+        cumulativeSizes[0] = 0;
+        for (label i = 1; i < N; i++)
+        {
+            cumulativeSizes[i] = cumulativeSizes[i-1] + sizes[i-1];
+        };
         for(label i = 0; i < N; i++)
         {
             beginRef[i] = list.cbegin() + cumulativeSizes[i];
@@ -197,6 +200,42 @@ Foam::ListListAddr<T>& Foam::ListListAddr<T>::operator = (Foam::ListListAddr<T>&
     }
     return *this;
 }
+
+// * * * * * * * * * * * * * * * Global functions  * * * * * * * * * * * * * //
+
+// convert a flat list into a list of lists based on the provided sublist sizes
+template<typename T>
+Foam::autoPtr<Foam::List<Foam::List<T>>> Foam::ListToListList(Foam::List<T>& list, const Foam::labelUList& sizes)
+{
+    using ll_t = List<List<T>>;
+    if (list.size() < sum(sizes))
+    {
+        FatalErrorInFunction<<"list is smaller than intended"<<abort(FatalError);
+    }
+    foamExecutor exec;
+    labelList cumulativeSizes(sizes.size(),poolSwitch(list.usePool()));
+    exec.exclusivePrefixSum(cumulativeSizes.begin(),const_cast<label*>(sizes.begin()), sizes.size());
+
+    auto autoPtrll = autoPtr<ll_t>::New(sizes.size(),List<T>(poolSwitch(list.usePool())),poolSwitch(list.usePool()));
+    ll_t& llRef = autoPtrll.ref();
+
+    auto llPtr = llRef.begin();
+    auto listPtr = list.begin();
+    const auto sizesPtr = sizes.cbegin();
+    const auto cumulativeSizesPtr = cumulativeSizes.cbegin();
+
+    auto Lambda = [=](label i){
+        llPtr[i].v_ = listPtr + cumulativeSizesPtr[i];
+        llPtr[i].size_ = sizesPtr[i];
+    };
+    exec.parallelFor(Lambda,sizes.size());
+
+    //release memory ownership
+    list.v_ = nullptr;
+    list.size_ = 0;
+
+    return autoPtrll;
+};
 
 #endif
 

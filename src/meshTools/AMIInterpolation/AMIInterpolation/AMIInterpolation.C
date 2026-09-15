@@ -37,7 +37,6 @@ License
 #include "ListOps.H"
 #include "ListListOps.H"
 #include "OFstream.H"
-#include "nvtx3/nvtx3.hpp"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -850,8 +849,10 @@ void Foam::AMIInterpolation::agglomerate
         exec.parallelFor(Lambda,sourceRestrictAddressing.size());
     }
 
+    // ensure new lists are on memory pool
     labelListList srcAddress(sourceCoarseSize,labelList(poolSwitch(1)),poolSwitch(1));
     scalarListList srcWeights(sourceCoarseSize,scalarList(poolSwitch(1)),poolSwitch(1));
+
     // Agglomerate weights and indices
     if (targetMapPtr)
     {
@@ -1079,45 +1080,6 @@ void Foam::AMIInterpolation::agglomerate
     else
     {
         // Non distribute AMI branch
-        //Info << "agglomerate 2 new singleproc" << endl;
-       //::nvtx3::scoped_range r{"agglomerate algorithm",::nvtx3::rgb(0, 0, 255)};
-/*
-        // TODO
-        forAll(fineSrcAddress, facei)
-        {
-            // All the elements contributing to facei. Are slots in
-            // mapDistribute'd data.
-            const labelList& elems = fineSrcAddress[facei];
-            const scalarList& weights = fineSrcWeights[facei];
-            const scalar fineArea = fineSrcMagSf[facei];
-
-            label coarseFacei = sourceRestrictAddressing[facei];
-
-            labelList& newElems = srcAddress[coarseFacei];
-            scalarList& newWeights = srcWeights[coarseFacei];
-
-            forAll(elems, i)
-            {
-                const label elemi = elems[i];
-                const label coarseElemi = targetRestrictAddressing[elemi];
-
-                const label index = newElems.find(coarseElemi);
-                if (index == -1)
-                {
-                    newElems.append(coarseElemi);
-                    newWeights.append(fineArea*weights[i]);
-                }
-                else
-                {
-                    newWeights[index] += fineArea*weights[i];
-                }
-            }
-        }
-*/
-
-
-        //labelListList cpuSrcAddress = srcAddress; // cpu copy for debugging
-        //scalarListList cpuSrcWeights = srcWeights; // cpu copy for debugging
         foamExecutor exec;
 
         const auto fineSrcAddrSizesPtr = fineSrcAddressAddr.sizes().cbegin();
@@ -1126,7 +1088,8 @@ void Foam::AMIInterpolation::agglomerate
         // max coarse element size
         labelList upperSizes(sourceCoarseSize, 0, poolSwitch(1));
         auto upperSizesPtr = upperSizes.begin();
-
+        // evaluate the maximum amount of fine faces that will map 
+        // to each coarse faces in the MG projection
         auto LambdaSize = [=](label facei)
         {
             const label coarseFacei = sourceRestrictAddressingPtr[facei];
@@ -1134,16 +1097,15 @@ void Foam::AMIInterpolation::agglomerate
         };
         exec.parallelFor(LambdaSize, fineSrcAddressAddr.sizes().size());
 
-        // allocate padded lists
-        forAll(srcAddress, i)
-        {
-            srcAddress[i] = labelList(upperSizes[i], -1,  poolSwitch(1));
-            srcWeights[i] = scalarList(upperSizes[i], 0.0, poolSwitch(1));
-        }
+        // allocate plain lists to use as scratch space for the new addressing and weights
+        const label sumUpperSizes = sum(upperSizes);
+        labelList scratchAddr(sumUpperSizes, -1, poolSwitch(1));
+        scalarList scratchWeights(sumUpperSizes, 0.0, poolSwitch(1));
+        // evaluate indirect addressing for the new coarse faces
+        srcAddressNewAddr.reset(new ListListAddr<labelList>(scratchAddr,upperSizes));
+        srcWeightsNewAddr.reset(new ListListAddr<scalarList>(scratchWeights,upperSizes));
 
-        srcAddressNewAddr.reset(new ListListAddr<labelList>(srcAddress));
-        srcWeightsNewAddr.reset(new ListListAddr<scalarList>(srcWeights));
-
+        // list to keep track of the number of real number of unique faces in the coarse mesh
         labelList slotCount(sourceCoarseSize, 0, poolSwitch(1));
 
         // fill kernel coarse addressing and weights
@@ -1200,31 +1162,42 @@ void Foam::AMIInterpolation::agglomerate
         exec.parallelFor(LambdaFill, fineSrcAddressAddr.sizes().size());
 
         // resize lists to actual number of unique coarse elements
-        forAll(srcAddress, i)
-        {
-            srcAddress[i].resize(slotCount[i]);   // occupied slots are a dense prefix [0..slotCount[i])
-            srcWeights[i].resize(slotCount[i]);
-        }
+        const label actualSize = sum(slotCount);
+        labelList scratchAddr2(actualSize,poolSwitch(1));
+        scalarList scratchWeights2(actualSize,poolSwitch(1));
+        auto scratchAddr2Ptr = scratchAddr2.begin();
+        auto scratchWeights2Ptr = scratchWeights2.begin();
+        const auto scratchAddrPtr = scratchAddr.begin();
+        const auto scratchWeightsPtr = scratchWeights.begin();
 
-
-        // label diffValue = 0;
-        // forAll(srcAddress, i)
-        // {
-        //     if (srcAddress[i].size() ==0)
-        //     {
-        //         Info<<"coarseSize[" << i <<"] is: "<< coarseSizes[i] <<endl;
-                
-        //     }
-        //     else if (srcAddress[i].size() != cpuSrcAddress[i].size())
-        //     {
-        //         Info<<"srcAddress[" << i <<"] is: "<< srcAddress[i].size() <<endl;
-        //     }
-        //     else
-        //     {
-        //         diffValue += abs(srcAddress[i].size() - cpuSrcAddress[i].size());
-        //     }
-        // };
-        // Info<< "diff:" << diffValue << endl;
+        labelList prefixUpperSizes(sourceCoarseSize,poolSwitch(1));
+        labelList prefixSlotCount(sourceCoarseSize,poolSwitch(1));
+        auto prefixUpperSizestPtr = prefixUpperSizes.begin();
+        auto prefixSlotCountPtr = prefixSlotCount.begin();
+        exec.exclusivePrefixSum(prefixUpperSizestPtr, upperSizesPtr, sourceCoarseSize);
+        exec.exclusivePrefixSum(prefixSlotCountPtr, slotCountPtr, sourceCoarseSize);
+        // TODO: this probably can be optimized further by leveraging the fact
+        // that the corse face array will be contiguous in memory except for the last few entries that
+        // remain initialized as -1 for the unused slots
+        auto LambdaCopy = [=](label i)
+            {
+                const label offset = prefixUpperSizestPtr[i];
+                const label offset2 = prefixSlotCountPtr[i];
+                for (size_t j = 0; j < slotCountPtr[i]; j++)
+                {
+                    scratchAddr2Ptr[offset2 + j] = scratchAddrPtr[offset + j];
+                    scratchWeights2Ptr[offset2 + j] = scratchWeightsPtr[offset + j];
+                }
+        };
+        exec.parallelFor(LambdaCopy, sourceCoarseSize);
+        // release larger scratch lists
+        scratchAddr.clear();
+        scratchWeights.clear();
+        // convert to ListList
+        auto addrll = ListToListList(scratchAddr2,slotCount);
+        auto weightsll = ListToListList(scratchWeights2,slotCount);
+        srcAddress = addrll.ref();
+        srcWeights = weightsll.ref();
 
     }
 

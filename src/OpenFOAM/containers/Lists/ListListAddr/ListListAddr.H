@@ -58,6 +58,7 @@ class ListListAddr
 private:
     
     using iterator_type = const typename T::value_type*;
+    using iterator_type_no_cv = typename T::value_type*;
 
     bool usepool_;
 

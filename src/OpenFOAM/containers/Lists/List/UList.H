@@ -78,6 +78,8 @@ template<class T, class Addr> class IndirectListBase;
 
 template<class T> Istream& operator>>(Istream&, UList<T>&);
 template<class T> Ostream& operator<<(Ostream&, const UList<T>&);
+template<class T> class autoPtr;
+template <typename type> autoPtr<List<List<type>>> ListToListList(List<type>& list, const UList<label>& sizes);
 
 // Common list types
 typedef UList<bool> boolUList;      //!< A UList of bools
@@ -183,6 +185,9 @@ public:
 
         //- Declare friendship with the SubList class
         friend class SubList<T>;
+    
+        template <typename type>
+        friend autoPtr<List<List<type>>> ListToListList(List<type>& list, const UList<label>& sizes);
 
 
     // Static Functions
