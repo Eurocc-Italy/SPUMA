@@ -274,9 +274,9 @@ void __launch_bounds__(1024) prefixSumKernel(
     const int tid = threadIdx.x;
     const int blockSize = blockDim.x;
     const size_t global_id = blockIdx.x * blockSize + tid;
-    const int lane_id = tid % WARP_SIZE;
-    const int warp_id = tid / WARP_SIZE;
-    const int n_warps = blockSize / WARP_SIZE; // assumes blockSize is a multiple of WARP_SIZE
+    const int lane_id = tid % warpSize;
+    const int warp_id = tid / warpSize;
+    const int n_warps = blockSize / warpSize; // assumes blockSize is a multiple of warpSize
     const int bid = blockIdx.x;
     const int element_per_block = blockSize * threadLocal<T>::element_per_thread;
 
@@ -289,9 +289,9 @@ void __launch_bounds__(1024) prefixSumKernel(
 
     // warp shfl scan upsweep
     // inter warp scan
-    constexpr unsigned mask = 0xFFFFFFFF;
+    constexpr unsigned mask = FULL_WARP_MASK_V;
     #pragma unroll
-    for(int offset = 1; offset < WARP_SIZE ; offset *= 2)
+    for(int offset = 1; offset < warpSize ; offset *= 2)
     {
         T tmp = __shfl_up_sync(mask, value, offset);
         if (lane_id >= offset) {
@@ -300,7 +300,7 @@ void __launch_bounds__(1024) prefixSumKernel(
     }
 
     // store warp-wide partial sums
-    if (lane_id == WARP_SIZE -1)
+    if (lane_id == warpSize -1)
     {
         s_data[warp_id] = value;
     }
@@ -312,7 +312,7 @@ void __launch_bounds__(1024) prefixSumKernel(
         T warp_sum = (tid < n_warps) ? s_data[tid] : zero_value;
         const T prev_value = warp_sum;
         #pragma unroll
-        for (int offset = 1; offset < WARP_SIZE; offset *= 2) {
+        for (int offset = 1; offset < warpSize; offset *= 2) {
             const T tmp = __shfl_up_sync(mask, warp_sum, offset);
             if (lane_id >= offset) {
                 warp_sum += tmp;
@@ -370,8 +370,6 @@ void Foam::cudaExecutor::_backendExclusiveSum
     valueT* block_sum = nullptr;
     if(num_blocks > 1)
     {
-        //cudaMallocAsync(&block_sum, num_blocks*sizeof(valueT), 0);
-        //cudaMemsetAsync(block_sum, 0, num_blocks*sizeof(valueT), 0);
         block_sum = static_cast<valueT*>
         (
             Spuma::MemoryPool::getInstance()->allocate(num_blocks*sizeof(valueT))
@@ -410,7 +408,6 @@ void Foam::cudaExecutor::_backendExclusiveSum
         );
         cudaDeviceSynchronize();
         CHECK_LAST_CUDA_ERROR();
-        //cudaFree(block_sum);
         Spuma::MemoryPool::getInstance()->free(block_sum);
     }
 

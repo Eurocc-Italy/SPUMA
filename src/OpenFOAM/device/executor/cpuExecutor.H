@@ -114,11 +114,14 @@ public:
     {
         if (size <= 0) return;
 
-        output[0] = pTraits<valueT>::zero;
-
-        for (label i = 1; i < size; i++)
+        // use a support variable to essentially hold the running sum
+        // and keep it an exclusive prefix sum via the memory order of 
+        // the output update and the accumulation of the running sum.
+        valueT accum = pTraits<valueT>::zero;
+        for (label i = 0; i < size; i++)
         {
-            output[i] = output[i-1] + input[i];
+            output[i] = accum;
+            accum += input[i];
         }
     }
 };

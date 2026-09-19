@@ -39,6 +39,7 @@ License
 #include "spinLock.hpp"
 #include "hipError.hpp"
 #include "deviceUtils.H"
+#include "recursivePrefixSumKernel.hpp"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -431,17 +432,6 @@ void Foam::hipExecutor::_backendReductionCompare
     Spuma::MemoryPool::getInstance()->free(dPtrResult);
 };
 
-template<typename F, typename resultT>
-void Foam::hipExecutor::_backendExclusiveSum
-(
-    valueT* const __restrict__ output,
-    valueT* const __restrict__ input,
-    const label& size
-);
-{
-    if (size <= 0) return;
-    NotImplemented;
-}
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
