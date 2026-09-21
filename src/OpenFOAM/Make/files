@@ -93,6 +93,8 @@ primitives/Tensor/floats/tensor2D.cxx
 primitives/Tensor/ints/labelTensor.cxx
 primitives/Tensor/lists/tensorLists.cxx
 
+primitives/Tensor4/tensor4Types.cxx
+
 primitives/Vector/complex/complexVector.cxx
 primitives/Vector/floats/floatVectors.cxx
 primitives/Vector/floats/floatVectors2D.cxx

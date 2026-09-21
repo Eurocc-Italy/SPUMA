@@ -27,6 +27,8 @@ License
 
 #include "LduMatrix.H"
 #include "fieldTypes.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 namespace Foam
 {
@@ -40,6 +42,8 @@ namespace Foam
     makeLduMatrix(sphericalTensor, sphericalTensor, scalar);
     makeLduMatrix(symmTensor, symmTensor, scalar);
     makeLduMatrix(tensor, tensor, scalar);
+    makeLduMatrix(tensor4, scalar, scalar);
+    makeLduMatrix(vector4, tensor4, tensor4);
 };
 
 

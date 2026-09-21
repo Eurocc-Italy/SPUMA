@@ -82,7 +82,7 @@ void Foam::LduMatrix<Type, DType, LUType>::Amul
 
         // Note: lowerCSR constructed from lower if available, upper otherwise
         //       so is handling symmetric()
-        const scalar* const __restrict__ lowercsrPtr = lowerCSR().begin();
+        const LUType* const __restrict__ lowercsrPtr = lowerCSR().begin();
 
         auto LambdaAmul = [=](label cell)
         {
@@ -271,7 +271,7 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
 
         // Note: lowerCSR constructed from lower if available, upper otherwise
         //       so is handling symmetric()
-        const scalar* const __restrict__ lowercsrPtr = lowerCSR().begin();
+        const LUType* const __restrict__ lowercsrPtr = lowerCSR().begin();
 
         auto LambdaAmul = [=](label cell)
         {
@@ -408,7 +408,7 @@ void Foam::LduMatrix<Type, DType, LUType>::residual
 
         // Note: lowerCSR constructed from lower if available, upper otherwise
         //       so is handling symmetric()
-        const scalar* const __restrict__ lowercsrPtr = lowerCSR().begin();
+        const LUType* const __restrict__ lowercsrPtr = lowerCSR().begin();
 
         auto LambdaAmul = [=](label cell)
         {
