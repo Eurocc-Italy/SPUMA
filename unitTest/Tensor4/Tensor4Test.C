@@ -36,3 +36,4 @@ int main()
     Info<< "Tensor4 primitive algebra test passed" << endl;
     return 0;
 }
+
