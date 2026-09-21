@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -39,6 +39,7 @@ License
 #include "spinLock.hpp"
 #include "hipError.hpp"
 #include "deviceUtils.H"
+#include "recursivePrefixSumKernel.hpp"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

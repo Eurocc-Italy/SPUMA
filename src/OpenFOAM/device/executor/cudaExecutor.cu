@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -39,6 +39,9 @@ License
 #include "warpReduce.cuh"
 #include "cudaError.cuh"
 #include "deviceUtils.H"
+#include "vector.H"
+#include "tensor.H"
+#include "recursivePrefixSumKernel.cuh"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -116,11 +119,19 @@ void reductionLambdaSumKernel
 
     __syncthreads();
 
-    if constexpr(std::is_same<resultType,double>::value || std::is_same<resultType,float>::value)
+    if constexpr(std::is_same_v<resultType,Foam::scalar> || std::is_same_v<resultType,Foam::label>)
     {
         if(tid == 0)
         {
             atomicAdd(result,sdata[0]);
+        }
+    }
+    else if constexpr(std::is_same_v<resultType,Foam::vector> || std::is_same_v<resultType,Foam::tensor>)
+    {
+        // parallel atomics for components of vector/tensor types
+        if (tid < resultType::nComponents)
+        {
+            atomicAdd(reinterpret_cast<typename resultType::cmptType*>(result) + tid, sdata[0][tid]);
         }
     }
     else
