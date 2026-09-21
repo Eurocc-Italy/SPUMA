@@ -318,6 +318,9 @@ $(fieldExpr)/pointPatchFields/exprValuePointPatchFields.C
 
 fvMatrices/fvMatrices.C
 fvMatrices/fvScalarMatrix/fvScalarMatrix.C
+fvMatrices/fvBlockMatrix/fvBlockMatrixOperators.C
+fvMatrices/fvBlockMatrix/fvBlockMatrixScalarScalarMatrix.C
+fvMatrices/fvBlockMatrix/fvBlockMatrixTensorVectorMatrix.C
 fvMatrices/solvers/MULES/MULES.C
 fvMatrices/solvers/GAMGSymSolver/GAMGAgglomerations/faceAreaPairGAMGAgglomeration/faceAreaPairGAMGAgglomeration.C
 

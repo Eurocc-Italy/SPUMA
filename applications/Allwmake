@@ -50,6 +50,7 @@ wmake $targetType solvers/compressible/rhoSimpleFoam
 wmake $targetType solvers/compressible/rhoPimpleFoam
 wmake $targetType solvers/incompressible/icoFoam
 wmake $targetType solvers/incompressible/pisoFoam
+wmake $targetType solvers/incompressible/pUCoupledFoam
 wmake $targetType solvers/incompressible/simpleFoam
 wmake $targetType solvers/incompressible/simpleFoam/SRFSimpleFoam
 wmake $targetType solvers/incompressible/pimpleFoam
