@@ -188,6 +188,20 @@ public:
             fvMatrix<sourceType>& matrix
         );
 
+        void insertMomentumEquation(fvVectorMatrix& matrix);
+
+        void insertPressureEquation(fvScalarMatrix& matrix);
+
+        void insertVelocityPressureCoupling
+        (
+            const fvBlockMatrix<vector, vector>& matrix
+        );
+
+        void insertPressureVelocityCoupling
+        (
+            const fvBlockMatrix<scalar, vector>& matrix
+        );
+
         template<class psiType>
         void initProcessorInterfaces
         (
@@ -287,6 +301,9 @@ tmp<fvBlockMatrix<sourceType, blockType> > operator+
 
 // Specialisation for vectors
 #include "fvBlockMatrixTensorVectorMatrix.H"
+
+// Specialisation for vector4/tensor4 systems
+#include "fvBlockMatrixVector4Tensor4Matrix.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
