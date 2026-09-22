@@ -67,7 +67,7 @@ void Foam::LduMatrix<Type, DType, LUType>::Amul
     );
 
     const label nCells = diag().size();
-    
+
     if (hasLowerCSR())
     {
         // Use cell-based looping
@@ -195,7 +195,7 @@ void Foam::LduMatrix<Type, DType, LUType>::Tmul
     );
 
     const label nCells = diag().size();
-        
+
     auto LambdaDiag = [=](label cell)
     {
         if constexpr(std::is_same<DType, Type>::value)
@@ -256,7 +256,7 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
     foamExecutor exec;
 
     Type localOne(pTraits<Type>::one);
-    
+
     if (hasLowerCSR())
     {
         // Use cell-based looping
@@ -266,8 +266,6 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
             addr.ownerStartAddr().begin();
         const label* const __restrict__ loStartPtr =
             addr.losortStartAddr().begin();
-        const label* const __restrict__ lcsrPtr =
-                addr.lowerCSRAddr().begin();
 
         // Note: lowerCSR constructed from lower if available, upper otherwise
         //       so is handling symmetric()
@@ -393,7 +391,7 @@ void Foam::LduMatrix<Type, DType, LUType>::residual
     );
 
     const label nCells = diag().size();
-    
+
     if (hasLowerCSR())
     {
         // Use cell-based looping
