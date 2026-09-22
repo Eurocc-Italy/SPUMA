@@ -41,6 +41,7 @@ Description
 #include "turbulentTransportModel.H"
 #include "simpleControl.H"
 #include "fvBlockMatrix.H"
+#include "fvBlockMatrixOperators.H"
 #include "vector4.H"
 #include "tensor4.H"
 #include "fvOptions.H"
@@ -66,6 +67,8 @@ int main(int argc, char *argv[])
     #include "createFields.H"
     #include "initContinuityErrs.H"
 
+    const scalar pAlpha = mesh.solutionDict().getOrDefault("pAlpha", 1.0);
+
     turbulence->validate();
 
     Info<< "\nStarting time loop\n" << endl;
@@ -74,9 +77,53 @@ int main(int argc, char *argv[])
     {
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
-        // Initialize the Up coupled system
+        // Work in progress: assemble the vector4/tensor4 coupled system
+        // to exercise the new insertion functions before adding the solve.
         fvBlockMatrix<vector4, tensor4> UpEqn(mesh);
-        // -- missing part TODO
+
+        // Assemble the momentum equation
+        fvVectorMatrix UEqn
+        (
+                fvm::div(phi, U)
+            + turbulence->divDevReff(U)
+            - fvOptions(U)
+        );
+
+        // Store the reciprocal momentum diagonal before relaxation
+        volScalarField rAU(1.0/UEqn.A());
+
+        // Relax and insert the momentum block
+        UEqn.relax();
+        UpEqn.insertMomentumEquation(UEqn);
+
+        // Build the Rhie-Chow pressure-correction source
+        surfaceScalarField presSource
+        (
+                "presSource",
+                pAlpha*fvc::interpolate(rAU)
+             *(fvc::interpolate(fvc::grad(p)) & mesh.Sf())
+        );
+
+        // Assemble the pressure equation
+        fvScalarMatrix pEqn
+        (
+            - pAlpha*fvm::laplacian(rAU, p)
+         ==
+            - fvc::div(presSource)
+        );
+
+        // Set the pressure reference and insert the pressure block
+        pEqn.setReference(pRefCell, pRefValue);
+        UpEqn.insertPressureEquation(pEqn);
+
+        // Assemble the off-diagonal pressure-velocity coupling blocks
+        fvBlockMatrix<vector, vector> dUByp(fvm::grad(p));
+        fvBlockMatrix<scalar, vector> dpByU(fvm::div(U));
+
+        UpEqn.insertVelocityPressureCoupling(dUByp);
+        UpEqn.insertPressureVelocityCoupling(dpByU);
+
+        // Assembly-only test: U and p are intentionally not updated yet.
     }
 
     #include "poolMaxOccupancy.H"
