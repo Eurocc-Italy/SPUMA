@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -26,39 +26,48 @@ License
     along with SPUMA.  If not, see <http://www.gnu.org/licenses/>.
 
 Struct
-    Foam::SharedMemory
+    Foam::spinLock
 
 Description
-    Simple wrapper to allow use of extern linked shared memory by simply
-    casting the same pointer to the desired type. This prevent multiple definition
-    of the same shared pointer of different type.
+    A struct to lock and unlock a mutex variable.
 
 SourceFiles
-    sharedMemory.H
+    spinLock.hpp
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef Foam_SharedMemory_H
-#define Foam_SharedMemory_H
+#ifndef Foam_spinLock_H
+#define Foam_spinLock_H
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
+namespace device
+{
+
 /*---------------------------------------------------------------------------*\
-                           Struct SharedMemory Declaration
+                           Struct spinLock Declaration
 \*---------------------------------------------------------------------------*/
 
-template <typename T>
-struct SharedMemory
+struct spinLock
 {
-    __device__ inline T *getPointer()
+    __device__ static inline void lock(int* mutex)
     {
-        extern __shared__ __align__(8) char smem[];
-        return reinterpret_cast<T*>(smem);
+        while (atomicCAS(mutex, 0, 1) == 1) {};
+    }
+
+    __device__ static inline void unlock(int* mutex)
+    {
+       atomicExch(mutex, 0);
     }
 };
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace device
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

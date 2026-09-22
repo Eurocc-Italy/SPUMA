@@ -33,225 +33,14 @@ License
 #include "cudaExecutor.cuh"
 #include "deviceInits.H"
 #include "deviceM.H"
-#include "sharedMemory.H"
-#include "mutex.H"
-#include "spinLock.cuh"
-#include "warpReduce.cuh"
 #include "cudaError.cuh"
 #include "deviceUtils.H"
+#include "label.H"
 #include "vector.H"
 #include "tensor.H"
-#include "recursivePrefixSumKernel.cuh"
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-namespace Foam
-{
-
-namespace cuda
-{
-
-template<typename F>
-__global__
-void lambdaKernel(F lambda, const label size)
-{
-    unsigned int id  = blockIdx.x *blockDim.x + threadIdx.x;
-    const unsigned int gridSize = blockDim.x*gridDim.x;
-
-    while (id < size)
-    {
-        lambda(id);
-        id += gridSize;
-    }
-};
-
-template <typename resultType, typename F>
-__global__
-void reductionLambdaSumKernel
-(
-    resultType* const __restrict__ result,
-    F lambda,
-    int* const __restrict__ mutex,
-    const label size
-)
-{
-    unsigned int id  = blockIdx.x * (2*blockDim.x) + threadIdx.x;
-    const unsigned int tid = threadIdx.x;
-    const label gsize = size;
-    const unsigned int blockSize = blockDim.x;
-    const unsigned int gridSize = blockDim.x*2*gridDim.x;
-
-    SharedMemory<resultType> smem;
-    resultType *sdata = smem.getPointer();
-    memset(&sdata[tid],0,sizeof(resultType));
-
-    __syncthreads();
-
-    // grid-wise reduction step
-    // load from gloabl memory + gsize/gridSize step of reduction
-    while (id < gsize)
-    {
-        // handle loop_len not multiple of blockSize
-        if (id+blockSize < gsize)
-        {
-            sdata[tid] += lambda(id) + lambda(id+blockSize);
-        }
-        else
-        {
-            sdata[tid] += lambda(id);
-        }
-        id += gridSize;
-    }
-
-    __syncthreads();
-
-    // block wise reduction steps
-    if (blockSize >= 512) { if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads(); }
-    if (blockSize >= 256) { if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads(); }
-    if (blockSize >= 128) { if (tid < 64)  { sdata[tid] += sdata[tid + 64];  } __syncthreads(); }
-
-    // warp wise reduction step
-    // in warp: syncthread guaranteed
-    if (tid < 32)
-    {
-        warpReduceNoVolatile<resultType>(sdata, tid, blockSize);
-    }
-
-    __syncthreads();
-
-    if constexpr(std::is_same_v<resultType,Foam::scalar> || std::is_same_v<resultType,Foam::label>)
-    {
-        if(tid == 0)
-        {
-            atomicAdd(result,sdata[0]);
-        }
-    }
-    else if constexpr(std::is_same_v<resultType,Foam::vector> || std::is_same_v<resultType,Foam::tensor>)
-    {
-        // parallel atomics for components of vector/tensor types
-        if (tid < resultType::nComponents)
-        {
-            atomicAdd(reinterpret_cast<typename resultType::cmptType*>(result) + tid, sdata[0][tid]);
-        }
-    }
-    else
-    {
-        // note for high number of block too much contention of the mutex!
-        if(tid == 0)
-        {
-            spinLock::lock(mutex);
-            __threadfence();
-            *result += sdata[0];
-            __threadfence();
-            spinLock::unlock(mutex);
-        }
-    }
-};
-
-//room for improvement
-template <typename resultType, typename F, typename Op>
-__global__
-void reductionLambdaCompareKernel
-(
-    resultType* const __restrict__ result,
-    F lambda,
-    Op op,
-    int* const __restrict__ mutex,
-    const label size
-)
-{
-    unsigned int id  = blockIdx.x * (2*blockDim.x) + threadIdx.x;
-    const unsigned int tid = threadIdx.x;
-    const label gsize = size;
-    const unsigned int blockSize = blockDim.x;
-    const unsigned int gridSize = blockDim.x*2*gridDim.x;
-
-    SharedMemory<resultType> smem;
-    resultType *sdata = smem.getPointer();
-    resultType tmp;
-    sdata[tid] = *result;
-
-    __syncthreads();
-
-    // grid-wise reduction step
-    // load from gloabl memory + gsize/gridSize step of reduction
-    while (id < gsize)
-    {
-        // handle loop_len not multiple of blockSize
-        if (id+blockSize < gsize)
-        {
-            tmp = op(lambda(id), lambda(id+blockSize));
-        }
-        else
-        {
-            tmp = lambda(id);
-        }
-        sdata[tid] = op(tmp, sdata[tid]);
-        id += gridSize;
-    }
-
-    __syncthreads();
-
-    // block wise reduction steps
-    if (blockSize >= 512)
-    {
-        if (tid < 256)
-        {
-            tmp = op(sdata[tid], sdata[tid + 256]);
-            __threadfence_block();
-            sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-    if (blockSize >= 256)
-    {
-        if (tid < 128)
-        {
-            tmp = op(sdata[tid], sdata[tid + 128]);
-            __threadfence_block();
-            sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-    if (blockSize >= 128)
-    {
-        if (tid < 64)
-        {
-            tmp = op(sdata[tid], sdata[tid + 64]);
-            __threadfence_block();
-            sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-
-    // warp wise reduction step
-    if (tid < 32)
-    {
-        warpReduceCompareNoVolatile<resultType,Op>(sdata, op, tid, blockSize);
-    }
-
-    __syncthreads();
-
-    // note for high number of block too much contention of the mutex!
-    if(tid == 0)
-    {
-        spinLock::lock(mutex);
-        __threadfence();
-        tmp = op(sdata[0],*result);
-        __threadfence();
-        *result = tmp;
-        __threadfence();
-        spinLock::unlock(mutex);
-    }
-};
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-} // End namespace cuda
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-} // End namespace Foam
+#include "parallelForKernel.H"
+#include "reductionKernel.H"
+#include "recursivePrefixSumKernel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -264,7 +53,7 @@ void Foam::cudaExecutor::_backendFor(F& lambda, const label& size)
     const label nThreadsPerBlock = cudaDeviceInit::getNumberOfThreadsPerBlock();
     const label numblocks = device::setNumBlocks(size, nThreadsPerBlock);
 
-    Foam::cuda::lambdaKernel<F>
+    Foam::device::lambdaKernel<F>
     <<<numblocks, nThreadsPerBlock>>>
     (lambda,size);
 
@@ -278,7 +67,7 @@ void Foam::cudaExecutor::_backendSerialFor(F& lambda, const label& size)
     if (size <= 0)
         return;
 
-    Foam::cuda::lambdaKernel<F><<<1,1>>>(lambda, size);
+    Foam::device::lambdaKernel<F><<<1,1>>>(lambda, size);
 
     cudaDeviceSynchronize();
     CHECK_LAST_CUDA_ERROR();
@@ -320,13 +109,13 @@ void Foam::cudaExecutor::_backendReductionSum
     (
         cudaFuncSetAttribute
         (
-            Foam::cuda::reductionLambdaSumKernel<resultT, F>,
+            Foam::device::reductionLambdaSumKernel<resultT, F>,
             cudaFuncAttributeMaxDynamicSharedMemorySize,
             maxbytes
         )
     );
 
-    Foam::cuda::reductionLambdaSumKernel<resultT, F>
+    Foam::device::reductionLambdaSumKernel<resultT, F>
     <<<(numBlocks + nStreamingMultiprocessors -1)/nStreamingMultiprocessors, nThreadsPerBlock, maxbytes>>>
     (
         dPtrResult,
@@ -386,13 +175,13 @@ void Foam::cudaExecutor::_backendReductionCompare
     (
         cudaFuncSetAttribute
         (
-            Foam::cuda::reductionLambdaCompareKernel<resultT, F, Op>,
+            Foam::device::reductionLambdaCompareKernel<resultT, F, Op>,
             cudaFuncAttributeMaxDynamicSharedMemorySize,
             maxbytes
         )
     );
 
-    Foam::cuda::reductionLambdaCompareKernel<resultT, F, Op>
+    Foam::device::reductionLambdaCompareKernel<resultT, F, Op>
     <<<(numBlocks + nStreamingMultiprocessors -1)/nStreamingMultiprocessors, nThreadsPerBlock, maxbytes>>>
     (
         dPtrResult,
@@ -413,6 +202,68 @@ void Foam::cudaExecutor::_backendReductionCompare
     );
 
     Spuma::MemoryPool::getInstance()->free(dPtrResult);
+};
+
+template<typename valueT>
+void Foam::cudaExecutor::_backendExclusiveSum
+(
+    valueT* const __restrict__ output,
+    valueT* const __restrict__ input,
+    const label& size
+)
+{
+    if (size <= 0) return;
+
+    constexpr size_t blockSize = 1024; // hardcode block size, best performance from tests
+    constexpr uint element_per_thread = Foam::device::threadLocal<valueT>::element_per_thread;
+    constexpr size_t element_per_block = element_per_thread * blockSize;
+
+    const size_t num_blocks = (size + element_per_block - 1) / element_per_block;
+    const size_t smem_size = element_per_block * sizeof(valueT);
+    valueT* block_sum = nullptr;
+    if(num_blocks > 1)
+    {
+        block_sum = static_cast<valueT*>
+        (
+            Spuma::MemoryPool::getInstance()->allocate(num_blocks*sizeof(valueT))
+        );
+
+        Spuma::MemoryPool::getInstance()->memSet
+        (
+            (void*) block_sum,
+            0,
+            num_blocks*sizeof(valueT)
+        );
+    }
+
+
+    Foam::device::prefixSumKernel<valueT><<<num_blocks,blockSize,smem_size>>>
+    (
+        output,
+        input,
+        size,
+        block_sum
+    );
+
+    cudaDeviceSynchronize();
+    CHECK_LAST_CUDA_ERROR();
+
+    // recursive block scan of the partial sums
+    if(num_blocks > 1)
+    {
+        Foam::cudaExecutor::_backendExclusiveSum<valueT>(block_sum,block_sum,num_blocks);
+
+        Foam::device::addBlockKernel<valueT><<<num_blocks,blockSize>>>(
+            output,
+            block_sum,
+            size,
+            element_per_block
+        );
+        cudaDeviceSynchronize();
+        CHECK_LAST_CUDA_ERROR();
+        Spuma::MemoryPool::getInstance()->free(block_sum);
+    }
+
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

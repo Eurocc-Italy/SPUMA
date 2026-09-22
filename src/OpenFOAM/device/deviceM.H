@@ -46,22 +46,10 @@ SourceFiles
     #define FOAM_DEVICE __host__ __device__
     #define FOAM_DEVICE_I __host__ __device__ __forceinline__
     #define FOAM_DEVICE_V __device__
-    // NVIDIA platform has a 32 bit mask (each bit represent a lane in the warp)
-    // while AMD has a 64 bit mask for historical reason:
-    // AMD devices have 64 thread per warp for gfx9 and 32 for gfx10 and above.
-    #if defined(have_cuda)
-        #define FULL_WARP_MASK_V 0xFFFFFFFF
-        #define WARP_MASK_T unsigned int
-    #elif defined(have_hip)
-        #define FULL_WARP_MASK_V 0xFFFFFFFFFFFFFFFFULL
-        #define WARP_MASK_T unsigned long long
-    #endif
 #else
     #define FOAM_DEVICE
     #define FOAM_DEVICE_I inline
     #define FOAM_DEVICE_V
-    #define FULL_WARP_MASK_V
-    #define WARP_MASK_T
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

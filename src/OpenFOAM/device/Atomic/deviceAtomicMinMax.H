@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -29,27 +29,23 @@ Description
     AtomicMin/Max implementations for float and double.
 
 SourceFiles
-    hipAtomicMinMax.hpp
+    deviceAtomicMinMax.hpp
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef Foam_hipAtomicMinMax_hpp
-#define Foam_hipAtomicMinMax_hpp
-
-#include "MemoryPoolBase.H"
-#include "hipError.hpp"
-#include <hip/hip_runtime.h>
+#ifndef Foam_deviceAtomicMinMax_hpp
+#define Foam_deviceAtomicMinMax_hpp
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-namespace hip
+namespace device
 {
 
 __device__ __forceinline__
-float hipAtomicMin(float *address, float val)
+float deviceAtomicMin(float *address, float val)
 {
     float old;
     old = !signbit(val) ? __int_as_float(atomicMin((int*)address, __float_as_int(val))) :
@@ -59,7 +55,7 @@ float hipAtomicMin(float *address, float val)
 }
 
 __device__ __forceinline__
-double hipAtomicMin(double *address, double val)
+double deviceAtomicMin(double *address, double val)
 {
     unsigned long long ret = __double_as_longlong(*address);
 
@@ -86,7 +82,7 @@ double hipAtomicMin(double *address, double val)
 }
 
 __device__ __forceinline__
-float hipAtomicMax(float *address, float val)
+float deviceAtomicMax(float *address, float val)
 {
     float old;
     old = !signbit(val) ? __int_as_float(atomicMax((int*)address, __float_as_int(val))) :
@@ -96,7 +92,7 @@ float hipAtomicMax(float *address, float val)
 }
 
 __device__ __forceinline__
-double hipAtomicMax(double *address, double val)
+double deviceAtomicMax(double *address, double val)
 {
     unsigned long long ret = __double_as_longlong(*address);
 
@@ -123,7 +119,7 @@ double hipAtomicMax(double *address, double val)
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-} // End namespace hip
+} // End namespace device
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

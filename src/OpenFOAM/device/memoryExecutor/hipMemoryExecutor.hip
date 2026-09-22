@@ -30,7 +30,7 @@ License
 #include <hip/hip_runtime.h>
 #include "hipMemoryExecutor.hpp"
 #include "deviceM.H"
-#include "memoryKernels.H"
+#include "memoryKernel.H"
 #include "error.H"
 #include "hipError.hpp"
 #include "hipDeviceInit.hpp"
@@ -106,7 +106,7 @@ void Foam::hipMemoryExecutor::_backendMemCopy
     else if (kind == memCopyKind::memCopyDeviceToDevice)
     {
         const label nThreadsPerBlock = hipDeviceInit::getNumberOfThreadsPerBlock();
-        const label numBlocks = device::setNumBlocks(size, nThreadsPerBlock); 
+        const label numBlocks = device::setNumBlocks(size, nThreadsPerBlock);
         hipLaunchKernelGGL
         (
             memCopyKernel,

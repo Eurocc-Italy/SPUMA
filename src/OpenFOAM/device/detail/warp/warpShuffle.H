@@ -29,8 +29,12 @@ Description
     Implement shfl_sync functions and define specializations
     for selected vectorSpace types (vector,tensor)
 
+Notes:
+    Keep mask type of "unsigned long long" for safe compatibility with
+    HIP (that uses unsigned long long) and CUDA (that uses unsigned long).
+
 SourceFiles
-    warpShuffle.hpp
+    warpShuffle.H
 
 \*---------------------------------------------------------------------------*/
 
@@ -42,12 +46,12 @@ SourceFiles
 #include "VectorSpace.H"
 #include "vector.H"
 #include "tensor.H"
-
+#include "deviceM.H"
 
 namespace Foam
 {
 
-namespace hip
+namespace device
 {
 
 template <typename T>
@@ -89,7 +93,7 @@ __device__ __inline__ T __shfl_sync
 // shfl functions for selected vectorspace types
 #define SHFL_FUNCS_FOR_VECTORSPACE(Type)                                  \
 __device__ __inline__ Type __shfl_down_sync(                              \
-unsigned long mask,                                                       \
+unsigned long long mask,                                                  \
 Type &val,                                                                \
 uint offset,                                                              \
 int width = warpSize)                                                     \
@@ -104,7 +108,7 @@ return tmp;                                                               \
 }                                                                         \
                                                                           \
 __device__ __inline__ Type __shfl_up_sync(                                \
-unsigned long mask,                                                       \
+unsigned long long mask,                                                  \
 Type &val,                                                                \
 uint offset,                                                              \
 int width = warpSize)                                                     \
@@ -118,7 +122,7 @@ _Pragma("unroll") for (direction cmp = 0; cmp < Type::nComponents; ++cmp) \
 return tmp;                                                               \
 }                                                                         \
 __device__ __inline__ Type __shfl_sync(                                   \
-unsigned long mask,                                                       \
+unsigned long long mask,                                                  \
 Type &val,                                                                \
 int srcLane,                                                              \
 int width = warpSize)                                                     \
@@ -138,7 +142,7 @@ SHFL_FUNCS_FOR_VECTORSPACE(Tensor<label>)
 
 #undef SHFL_FUNCS_FOR_VECTORSPACE
 
-}; // namespace cuda
+}; // namespace device
 
 }; // namespace Foam
 

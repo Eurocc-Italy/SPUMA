@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -26,38 +26,34 @@ License
     along with SPUMA.  If not, see <http://www.gnu.org/licenses/>.
 
 Struct
-    Foam::cudaAtomic
+    Foam::deviceAtomic
 
 Description
-    CUDA atomic backend
+    HIP and CUDA atomic backend (AMD ROCm and NVIDIA CUDA)
 
 SourceFiles
-    cudaAtomic.cuh
+    deviceAtomic.H
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef Foam_cuda_Atomic_H
-#define Foam_cuda_Atomic_H
+#ifndef Foam_device_Atomic_H
+#define Foam_device_Atomic_H
 
 #include "Atomic.H"
-#include "cudaAtomicMinMax.cuh"
+#include "deviceAtomicMinMax.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-/*---------------------------------------------------------------------------*\
-                           struct cudaAtomic Declaration
-\*---------------------------------------------------------------------------*/
-
-struct cudaAtomic
-: Atomic<cudaAtomic>
+struct deviceAtomic
+: Atomic<deviceAtomic>
 {
     template<class T>
     struct atomicPlusEqOp
     {
-        void operator()(T& x, const T& y) const
+        FOAM_DEVICE void operator()(T& x, const T& y) const
         {
             atomicAdd(&x, y);
         }
@@ -66,7 +62,7 @@ struct cudaAtomic
     template<class T>
     struct atomicMaxEqOp
     {
-        void operator()(T& x, const T& y) const
+        FOAM_DEVICE void operator()(T& x, const T& y) const
         {
             _backendAtomicMax(x, y);
         }
@@ -75,65 +71,65 @@ struct cudaAtomic
     template<class T>
     struct atomicMinEqOp
     {
-        void operator()(T& x, const T& y) const
+        FOAM_DEVICE void operator()(T& x, const T& y) const
         {
             _backendAtomicMin(x, y);
         }
     };
 
-    static void _backendAtomicAdd(scalar& x, const scalar& y)
+    FOAM_DEVICE static void _backendAtomicAdd(scalar& x, const scalar& y)
     {
         atomicAdd(&x, y);
     }
 
 #ifdef WM_SPDP
-    static void _backendAtomicAdd(solveScalar& x, const solveScalar& y)
+    FOAM_DEVICE static void _backendAtomicAdd(solveScalar& x, const solveScalar& y)
     {
         atomicAdd(&x, y);
     }
 #endif
 
-    static void _backendAtomicAdd(label& x, const label& y)
+    FOAM_DEVICE static void _backendAtomicAdd(label& x, const label& y)
     {
         atomicAdd(&x, y);
     }
 
-    static void  _backendAtomicMax(scalar& x, const scalar& y)
+    FOAM_DEVICE static void  _backendAtomicMax(scalar& x, const scalar& y)
     {
-        cuda::cudaAtomicMax(&x, y);
+        device::deviceAtomicMax(&x, y);
     }
 
 #ifdef WM_SPDP
-    static void  _backendAtomicMax(solveScalar& x, const solveScalar& y)
+    FOAM_DEVICE static void _backendAtomicMax(solveScalar& x, const solveScalar& y)
     {
-        cuda::cudaAtomicMax(&x, y);
+        device::deviceAtomicMax(&x, y);
     }
 #endif
 
-    static void  _backendAtomicMax(label& x, const label& y)
+    FOAM_DEVICE static void  _backendAtomicMax(label& x, const label& y)
     {
         atomicMax(&x, y);
     }
 
-    static void  _backendAtomicMin(scalar& x, const scalar& y)
+    FOAM_DEVICE static void  _backendAtomicMin(scalar& x, const scalar& y)
     {
-        cuda::cudaAtomicMin(&x, y);
+        device::deviceAtomicMin(&x, y);
     }
 
 #ifdef WM_SPDP
-    static void  _backendAtomicMin(solveScalar& x, const solveScalar& y)
+    FOAM_DEVICE static void  _backendAtomicMin(solveScalar& x, const solveScalar& y)
     {
-        cuda::cudaAtomicMin(&x, y);
+        device::deviceAtomicMin(&x, y);
     }
 #endif
 
-    static void  _backendAtomicMin(label& x, const label& y)
+    FOAM_DEVICE static void  _backendAtomicMin(label& x, const label& y)
     {
         atomicMin(&x, y);
     }
 
     template<class Form, class Cmpt, direction Ncmpts>
-    static void _backendAtomicAdd
+    FOAM_DEVICE static void _backendAtomicAdd
     (
         VectorSpace<Form, Cmpt, Ncmpts>& vs1,
         const VectorSpace<Form, Cmpt, Ncmpts>& vs2
@@ -143,7 +139,7 @@ struct cudaAtomic
     }
 
     template<class Form, class Cmpt, direction Ncmpts>
-    static void _backendAtomicMax
+    FOAM_DEVICE static void _backendAtomicMax
     (
         VectorSpace<Form, Cmpt, Ncmpts>& vs1,
         const VectorSpace<Form, Cmpt, Ncmpts>& vs2
@@ -153,7 +149,7 @@ struct cudaAtomic
     }
 
     template<class Form, class Cmpt, direction Ncmpts>
-    static void _backendAtomicMin
+    FOAM_DEVICE static void _backendAtomicMin
     (
         VectorSpace<Form, Cmpt, Ncmpts>& vs1,
         const VectorSpace<Form, Cmpt, Ncmpts>& vs2
@@ -162,7 +158,7 @@ struct cudaAtomic
         VectorSpaceOps<Ncmpts,0>::eqOp(vs1, vs2, atomicMinEqOp<Cmpt>());
     }
 
-    static label _backendAtomicCAS
+    FOAM_DEVICE static label _backendAtomicCAS
     (
         label& x,
         const label& compare,
