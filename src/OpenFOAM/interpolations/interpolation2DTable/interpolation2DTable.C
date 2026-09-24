@@ -79,10 +79,14 @@ Foam::interpolation2DTable<Type>::interpolation2DTable
 
 
 template<class Type>
-Foam::interpolation2DTable<Type>::interpolation2DTable(const fileName& fName)
+Foam::interpolation2DTable<Type>::interpolation2DTable
+(
+    const fileName& fName,
+    const bounds::normalBounding bounding
+)
 :
     List<value_type>(),
-    bounding_(bounds::normalBounding::WARN),
+    bounding_(bounding),
     fileName_(fName),
     reader_(new openFoamTableReader<Type>())
 {
