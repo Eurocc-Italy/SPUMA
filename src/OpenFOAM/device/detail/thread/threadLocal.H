@@ -26,45 +26,26 @@ License
     along with SPUMA.  If not, see <http://www.gnu.org/licenses/>.
 
 Description
-    Implement parallel exlusive prefix sum for primitive and
-    general vectorspace data type.
-    The partial block prefix sum is based on Blelloch's algorithm and uses
-    a divide and conquer approach for array sizes greater than the blocksize.
-    With respect to the reference cited there are different design choises
-    implemented:
-    - Increase ILP for primitive data types (int,float,double) via per thread
-    partial prefix sum
-    - Use shfl_sync functions to reduce shared memory footprint,
-    synchrnonization points and memory latency via warp level prefix sum steps
+    Define a thread-local  structure for handling per-thread data
+    with vector type specialization for selected data types. This is
+    done to increase overall throughput by hiding memory latency and
+    increase ILP (Instruction Level Parallelism).
 
-
-Reference:
-    \verbatim
-        Base algorithm reference:
-            Harris, Mark, Sengupta, S., & Owens, J. D. (2007).
-            Parallel prefix sum (scan) with CUDA. GPU gems, 3(39), 851-876.
-    \endverbatim
 
 SourceFiles
-    recursivePrefixSumKernel.hpp
+    threadLocal.H
 
 \*---------------------------------------------------------------------------*/
-#ifndef Foam_hip_recursive_prefix_sum_kernel_H
-#define Foam_hip_recursive_prefix_sum_kernel_H
-
-#include "warpShuffle.hpp"
-#include "deviceM.H"
-#include "label.H"
-
+#ifndef Foam_threadLocal_H
+#define Foam_threadLocal_H
 
 namespace Foam
 {
 
-namespace hip
+namespace device
 {
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
 
 template <typename T>
 struct type_tuning
@@ -239,180 +220,13 @@ THREAD_LOCAL_SPECIALIZATION(int)
 THREAD_LOCAL_SPECIALIZATION(float)
 THREAD_LOCAL_SPECIALIZATION(double)
 
-template <typename T>
-__global__
-void addBlockKernel(
-    T* const __restrict__ output,
-    T* const __restrict__ block_sum,
-    const int size,
-    const int element_per_block
-)
-{
-    unsigned int id  = blockIdx.x *blockDim.x + threadIdx.x;
-    const unsigned int gridSize = blockDim.x*gridDim.x;
 
-    while(id < size)
-    {
-        const unsigned int logical_bid = id / (element_per_block);
-        output[id] += block_sum[logical_bid];
-        id += gridSize;
-    }
-};
-
-template <typename T>
-__global__
-void __launch_bounds__(1024) prefixSumKernel(
-    T* const __restrict__ output,
-    T* const __restrict__ input,
-    int size,
-    T* const __restrict__ block_sum = nullptr
-)
-{
-    extern __shared__ char smem_raw[];
-    T* s_data = reinterpret_cast<T*>(smem_raw);
-
-    const int tid = threadIdx.x;
-    const int blockSize = blockDim.x;
-    const size_t global_id = blockIdx.x * blockSize + tid;
-    const int lane_id = tid % warpSize;
-    const int warp_id = tid / warpSize;
-    const int n_warps = blockSize / warpSize; // assumes blockSize is a multiple of warpSize
-    const int bid = blockIdx.x;
-   //const int element_per_block = blockSize * threadLocal<T>::element_per_thread;
-
-    const T zero_value{};
-    // load data
-    threadLocal<T> thread_data;
-    thread_data.padded_load(global_id, size, input, zero_value);
-    const T init_value = thread_data.reduce();
-    T value = init_value;
-
-    // warp shfl scan upsweep
-    // inter warp scan
-    constexpr uint64_t mask = FULL_WARP_MASK_V;
-    #pragma unroll
-    for(int offset = 1; offset < warpSize ; offset *= 2)
-    {
-        T tmp = __shfl_up_sync(mask, value, offset);
-        if (lane_id >= offset) {
-            value += tmp;
-        }
-    }
-
-    // store warp-wide partial sums
-    if (lane_id == warpSize -1)
-    {
-        s_data[warp_id] = value;
-    }
-    __syncthreads();
-
-    // first warp does the inter-warp pass
-    if (warp_id == 0)
-    {
-        T warp_sum = (tid < n_warps) ? s_data[tid] : zero_value;
-        const T prev_value = warp_sum;
-        #pragma unroll
-        for (int offset = 1; offset < warpSize; offset *= 2) {
-            const T tmp = __shfl_up_sync(mask, warp_sum, offset);
-            if (lane_id >= offset) {
-                warp_sum += tmp;
-            }
-        }
-
-        if (tid < n_warps) {
-            s_data[tid] = warp_sum - prev_value;
-        }
-
-    }
-    __syncthreads();
-
-    // scan down sweep
-    // add the inter-warp scan result to each warp
-    value += s_data[warp_id];
-
-    // block aggregate
-    if (block_sum && tid == blockSize - 1) {
-        // value is inclusive scan within this warp
-        // s_data[warp_id] is exclusive prefix of previous warps
-        block_sum[bid] = value;
-    }
-
-    // convert to exclusive
-    value -= init_value;
-
-    // store data
-    thread_data.exclusive_sum_store(global_id, size, output, value);
-};
-
-} // namespace cuda
-
+#undef THREAD_LOCAL_SPECIALIZATION
+#undef TYPE_TUNING_SPECIALIZATION
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// host side function
-
-template<typename valueT>
-void Foam::hipExecutor::_backendExclusiveSum
-(
-    valueT* const __restrict__ output,
-    valueT* const __restrict__ input,
-    const label& size
-)
-{
-    if (size <= 0) return;
-
-    constexpr size_t blockSize = 1024; // hardcode block size, best performance from tests
-    constexpr uint element_per_thread = Foam::hip::threadLocal<valueT>::element_per_thread;
-    constexpr size_t element_per_block = element_per_thread * blockSize;
-
-    const size_t num_blocks = (size + element_per_block - 1) / element_per_block;
-    const size_t smem_size = element_per_block * sizeof(valueT);
-    valueT* block_sum = nullptr;
-    if(num_blocks > 1)
-    {
-        block_sum = static_cast<valueT*>
-        (
-            Spuma::MemoryPool::getInstance()->allocate(num_blocks*sizeof(valueT))
-        );
-
-        Spuma::MemoryPool::getInstance()->memSet
-        (
-            (void*) block_sum,
-            0,
-            num_blocks*sizeof(valueT)
-        );
-    }
-
-
-    Foam::hip::prefixSumKernel<valueT><<<num_blocks,blockSize,smem_size>>>
-    (
-        output,
-        input,
-        size,
-        block_sum
-    );
-
-    hipDeviceSynchronize();
-    CHECK_LAST_HIP_ERROR();
-
-    // recursive block scan of the partial sums
-    if(num_blocks > 1)
-    {
-        Foam::hipExecutor::_backendExclusiveSum<valueT>(block_sum,block_sum,num_blocks);
-
-        Foam::hip::addBlockKernel<valueT><<<num_blocks,blockSize>>>(
-            output,
-            block_sum,
-            size,
-            element_per_block
-        );
-        hipDeviceSynchronize();
-        CHECK_LAST_HIP_ERROR();
-        Spuma::MemoryPool::getInstance()->free(block_sum);
-    }
-
-};
-
+} // namespace device
 
 } // namespace Foam
 
@@ -420,3 +234,4 @@ void Foam::hipExecutor::_backendExclusiveSum
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+

@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -40,10 +40,8 @@ SourceFiles
 #include "Atomic.H"
 #include "cpuAtomic.H"
 
-#ifdef have_cuda
-    #include "cudaAtomic.cuh"
-#elif have_hip
-    #include "hipAtomic.hpp"
+#if defined(have_cuda) || defined(have_hip)
+    #include "deviceAtomic.H"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -51,10 +49,8 @@ SourceFiles
 namespace Foam
 {
 
-#ifdef have_cuda
-    typedef cudaAtomic foamAtomic;
-#elif have_hip
-    typedef hipAtomic foamAtomic;
+#if defined(have_cuda) || defined(have_hip)
+    typedef deviceAtomic foamAtomic;
 #else
     typedef cpuAtomic foamAtomic;
 #endif

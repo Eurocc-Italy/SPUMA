@@ -72,6 +72,11 @@ struct nameOp<int64_t>
 };
 
 
+inline int64_t magSqr(const int64_t val)
+{
+    return val*val;
+}
+
 inline int64_t mag(const int64_t val)
 {
     return ::labs(val);

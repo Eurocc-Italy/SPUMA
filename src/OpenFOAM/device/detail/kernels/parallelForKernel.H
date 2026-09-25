@@ -7,7 +7,7 @@
      0    |_______/   |__| o   o \______/  |__| 0|__| /__/  o  \__\   o
   O   o  o        0  o      0   O        o    o       O  o     0   o    0  o
 -------------------------------------------------------------------------------
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of SPUMA.
@@ -25,56 +25,49 @@ License
     You should have received a copy of the GNU General Public License
     along with SPUMA.  If not, see <http://www.gnu.org/licenses/>.
 
-Struct
-    Foam::spinLock
-
 Description
-    A struct to lock and unlock a mutex variable.
+    Implement gpu primitive kernels for:
+    - element-wise operations that apply an element-wise lambda function
+
 
 SourceFiles
-    spinLock.hpp
+    parallelForKernel.H
 
 \*---------------------------------------------------------------------------*/
+#ifndef Foam_device_paralleForKernel_H
+#define Foam_device_paralleForKernel_H
 
-#ifndef Foam_spinLock_hpp
-#define Foam_spinLock_hpp
+#include "label.H"
+#include "deviceM.H"
 
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * Kernels  * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-namespace hip
+namespace device
 {
 
-/*---------------------------------------------------------------------------*\
-                           Struct spinLock Declaration
-\*---------------------------------------------------------------------------*/
-
-struct spinLock
+template<typename F>
+__global__
+void lambdaKernel(F lambda, const label size)
 {
-    __device__ static inline void lock(int* mutex)
-    {
-        while (atomicCAS(mutex, 0, 1) == 1) {};
-    }
+    unsigned int id  = blockIdx.x *blockDim.x + threadIdx.x;
+    const unsigned int gridSize = blockDim.x*gridDim.x;
 
-    __device__ static inline void unlock(int* mutex)
+    while (id < size)
     {
-       atomicExch(mutex, 0);
+        lambda(id);
+        id += gridSize;
     }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-} // End namespace hip
+} // namespace device
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-} // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+} // namespace Foam
 
 #endif
-
-// ************************************************************************* //

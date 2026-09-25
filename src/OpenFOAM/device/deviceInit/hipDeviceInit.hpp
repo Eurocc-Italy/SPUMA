@@ -78,10 +78,10 @@ public:
     {
         sharedMemoryPerBlockPercentage_ = percentage;
     };
-    
+
     static int getSharedMemoryPerBlock()
     {
-        // note use a percentage of max allowable dynamic shared memory 
+        // note use a percentage of max allowable dynamic shared memory
         // because driver always reserve some of the total shared memory for static allocated object
         return prop_.sharedMemPerBlockOptin * sharedMemoryPerBlockPercentage_;
     }
@@ -99,6 +99,14 @@ public:
     static int _getNumberOfThreadsPerBlock()
     {
         return nThreadsPerBlock_;
+    }
+
+    // add API to get the warp size of the device given that for gfx10 and above
+    // the warp size decreased from 64 to 32 and ROCm does not assume it to be a compile time
+    // constant on the host, we need to query it at runtime instead.
+    static int getWarpSize()
+    {
+        return prop_.warpSize;
     }
 };
 

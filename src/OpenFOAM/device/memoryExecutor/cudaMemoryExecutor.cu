@@ -29,7 +29,7 @@ License
 
 #include <cuda_runtime_api.h>
 #include "cudaMemoryExecutor.cuh"
-#include "memoryKernels.H"
+#include "memoryKernel.H"
 #include "error.H"
 #include "cudaError.cuh"
 #include "cudaDeviceInit.cuh"

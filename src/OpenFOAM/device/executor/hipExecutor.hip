@@ -33,226 +33,12 @@ License
 #include "hipExecutor.hpp"
 #include "deviceInits.H"
 #include "deviceM.H"
-#include "sharedMemory.H"
-#include "mutex.H"
-#include "warpReduce.hpp"
-#include "spinLock.hpp"
 #include "hipError.hpp"
 #include "deviceUtils.H"
-#include "recursivePrefixSumKernel.hpp"
+#include "parallelForKernel.H"
+#include "reductionKernel.H"
+#include "recursivePrefixSumKernel.H"
 
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-namespace Foam
-{
-
-namespace hip
-{
-
-template<typename F>
-__global__
-void lambdaKernel(F lambda, const label size)
-{
-    unsigned int id  = blockIdx.x *blockDim.x + threadIdx.x;
-    const unsigned int gridSize = blockDim.x*gridDim.x;
-
-    while (id < size)
-    {
-        lambda(id);
-        id += gridSize;
-    }
-};
-
-template <typename resultType, typename F>
-__global__
-void reductionLambdaSumKernel
-(
-    resultType* const __restrict__ result,
-    F lambda,
-    int* const __restrict__ mutex,
-    const label size
-)
-{
-    unsigned int id  = blockIdx.x * (2*blockDim.x) + threadIdx.x;
-    const unsigned int tid = threadIdx.x;
-    const label gsize = size;
-    const unsigned int blockSize = blockDim.x;
-    const unsigned int gridSize = blockDim.x*2*gridDim.x;
-
-    SharedMemory<resultType> smem;
-    resultType *sdata = smem.getPointer();
-    memset(&sdata[tid], 0, sizeof(resultType));
-
-    __syncthreads();
-
-    // grid-wise reduction step
-    // load from gloabl memory + gsize/gridSize step of reduction
-    while (id < gsize)
-    {
-        // handle loop_len not multiple of blockSize
-        if (id + blockSize < gsize)
-        {
-            sdata[tid] += lambda(id) + lambda(id+blockSize);
-        }
-        else
-        {
-            sdata[tid] += lambda(id);
-        }
-        id += gridSize;
-    }
-
-    __syncthreads();
-
-    // block wise reduction steps
-    if (blockSize >= 1024) { if (tid < 512) { sdata[tid] += sdata[tid + 512]; } __syncthreads(); }
-    if (blockSize >= 512)  { if (tid < 256) { sdata[tid] += sdata[tid + 256]; } __syncthreads(); }
-    if (blockSize >= 256)  { if (tid < 128) { sdata[tid] += sdata[tid + 128]; } __syncthreads(); }
-    if (blockSize >= 128)  { if (tid < 64)  { sdata[tid] += sdata[tid + 64];  } __syncthreads(); }
-
-    // warp wise reduction step
-    //in warp: syncthread guaranteed
-    if (tid < 32)
-    {
-        warpReduceNoVolatile<resultType>(sdata, tid, blockSize);
-    }
-
-    __syncthreads();
-
-    //if constexpr(std::is_same<resultType,double>::value)
-    if constexpr(std::is_same<resultType,double>::value || std::is_same<resultType,float>::value)
-    {
-        if(tid == 0)
-        {
-            atomicAdd(result,sdata[0]);
-        }
-    }
-    else
-    {
-        // note for high number of block too much contention of the mutex!
-        if(tid == 0)
-        {
-            spinLock::lock(mutex);
-            __threadfence();
-            *result += sdata[0];
-            __threadfence();
-             spinLock::unlock(mutex);
-        }
-    }
-};
-
-// room for improvement
-template <typename resultType, typename F, typename Op>
-__global__
-void reductionLambdaCompareKernel
-(
-    resultType* const __restrict__ result,
-    F lambda,
-    Op op,
-    int* const __restrict__ mutex,
-    const label size
-)
-{
-    unsigned int id  = blockIdx.x * (2*blockDim.x) + threadIdx.x;
-    const unsigned int tid = threadIdx.x;
-    const label gsize = size;
-    const unsigned int blockSize = blockDim.x;
-    const unsigned int gridSize = blockDim.x*2*gridDim.x;
-
-    SharedMemory<resultType> smem;
-    resultType *sdata = smem.getPointer();
-    resultType tmp;
-    sdata[tid] = *result;
-
-    __syncthreads();
-
-    // grid-wise reduction step
-    // load from gloabl memory + gsize/gridSize step of reduction
-    while (id < gsize)
-    {
-        // handle loop_len not multiple of blockSize
-        if (id+blockSize < gsize)
-        {
-            tmp = op(lambda(id), lambda(id + blockSize));
-        }
-        else
-        {
-            tmp = lambda(id);
-        }
-        sdata[tid]=op(tmp,sdata[tid]);
-        id += gridSize;
-    }
-
-    __syncthreads();
-
-    // block wise reduction steps
-    if (blockSize >= 1024)
-    {
-        if (tid < 512)
-        {
-            tmp = op(sdata[tid], sdata[tid + 512]);
-            __threadfence_block();
-            sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-    if (blockSize >= 512)
-    {
-        if (tid < 256)
-        {
-            tmp = op(sdata[tid], sdata[tid + 256]);
-            __threadfence_block();
-            sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-    if (blockSize >= 256)
-    {
-        if (tid < 128)
-        {
-            tmp = op(sdata[tid], sdata[tid + 128]);
-            __threadfence_block();
-            sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-    if (blockSize >= 128)
-    {
-        if (tid < 64)
-        {
-            tmp = op(sdata[tid], sdata[tid + 64]);
-            __threadfence_block();
-                sdata[tid] = tmp;
-        }
-        __syncthreads();
-    }
-
-    // warp wise reduction step
-    if (tid < 32)
-    {
-        warpReduceCompareNoVolatile<resultType,Op>(sdata,op,tid,blockSize);
-    }
-
-    __syncthreads();
-    // note for high number of block too much contention of the mutex!
-    if(tid == 0)
-    {
-        spinLock::lock(mutex);
-        __threadfence();
-        tmp = op(sdata[0],*result);
-        __threadfence();
-        *result = tmp;
-        __threadfence();
-        spinLock::unlock(mutex);
-    }
-};
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-} // End namespace hip
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-} // End namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -267,7 +53,7 @@ void Foam::hipExecutor::_backendFor(F& lambda, const label& size)
 
     hipLaunchKernelGGL
     (
-        Foam::hip::lambdaKernel<F>,
+        Foam::device::lambdaKernel<F>,
         numBlocks,
         nThreadsPerBlock,
         0,
@@ -288,7 +74,7 @@ void Foam::hipExecutor::_backendSerialFor(F& lambda, const label& size)
 
     hipLaunchKernelGGL
     (
-        Foam::hip::lambdaKernel<F>,
+        Foam::device::lambdaKernel<F>,
         1,
         1,
         0,
@@ -337,7 +123,7 @@ void Foam::hipExecutor::_backendReductionSum(
     (
         hipFuncSetAttribute
         (
-            reinterpret_cast<const void*>(Foam::hip::reductionLambdaSumKernel<resultT,F>),
+            reinterpret_cast<const void*>(Foam::device::reductionLambdaSumKernel<resultT,F>),
             hipFuncAttributeMaxDynamicSharedMemorySize,
             maxbytes
         )
@@ -347,7 +133,7 @@ void Foam::hipExecutor::_backendReductionSum(
     //       preprocessor cannot parse the hipLaunchKernelGGL macro correctly
     hipLaunchKernelGGL
     (
-        (Foam::hip::reductionLambdaSumKernel<resultT,F>),
+        (Foam::device::reductionLambdaSumKernel<resultT,F>),
         (numBlocks + nStreamingMultiprocessors - 1)/nStreamingMultiprocessors,
         nThreadsPerBlock,
         maxbytes,
@@ -403,7 +189,7 @@ void Foam::hipExecutor::_backendReductionCompare
     (
         hipFuncSetAttribute
         (
-            reinterpret_cast<const void*>(Foam::hip::reductionLambdaCompareKernel<resultT,F,Op>),
+            reinterpret_cast<const void*>(Foam::device::reductionLambdaCompareKernel<resultT,F,Op>),
             hipFuncAttributeMaxDynamicSharedMemorySize,
             maxbytes
         )
@@ -413,7 +199,7 @@ void Foam::hipExecutor::_backendReductionCompare
     //       preprocessor cannot parse the hipLaunchKernelGGL macro correctly
     hipLaunchKernelGGL
     (
-        (Foam::hip::reductionLambdaCompareKernel<resultT,F,Op>),
+        (Foam::device::reductionLambdaCompareKernel<resultT,F,Op>),
         (numBlocks + nStreamingMultiprocessors - 1)/nStreamingMultiprocessors,
         nThreadsPerBlock,
         maxbytes,
@@ -430,6 +216,70 @@ void Foam::hipExecutor::_backendReductionCompare
 
     Spuma::MemoryPool::getInstance()->copyOut(dPtrResult, result, sizeof(resultT));
     Spuma::MemoryPool::getInstance()->free(dPtrResult);
+};
+
+template<typename valueT>
+void Foam::hipExecutor::_backendExclusiveSum
+(
+    valueT* const __restrict__ output,
+    valueT* const __restrict__ input,
+    const label& size
+)
+{
+    if (size <= 0) return;
+
+    constexpr size_t blockSize = 1024; // hardcode block size, best performance from tests
+    constexpr uint element_per_thread = Foam::device::threadLocal<valueT>::element_per_thread;
+    constexpr size_t element_per_block = element_per_thread * blockSize;
+
+    const size_t num_blocks = (size + element_per_block - 1) / element_per_block;
+    // assume blocksize a multiple of the warp size
+    const size_t n_warps = blockSize / hipDeviceInit::getWarpSize();
+    const size_t smem_size = n_warps * sizeof(valueT);
+    valueT* block_sum = nullptr;
+    if(num_blocks > 1)
+    {
+        block_sum = static_cast<valueT*>
+        (
+            Spuma::MemoryPool::getInstance()->allocate(num_blocks*sizeof(valueT))
+        );
+
+        Spuma::MemoryPool::getInstance()->memSet
+        (
+            (void*) block_sum,
+            0,
+            num_blocks*sizeof(valueT)
+        );
+    }
+
+
+    Foam::device::prefixSumKernel<valueT><<<num_blocks,blockSize,smem_size>>>
+    (
+        output,
+        input,
+        size,
+        block_sum
+    );
+
+    hipDeviceSynchronize();
+    CHECK_LAST_HIP_ERROR();
+
+    // recursive block scan of the partial sums
+    if(num_blocks > 1)
+    {
+        Foam::hipExecutor::_backendExclusiveSum<valueT>(block_sum,block_sum,num_blocks);
+
+        Foam::device::addBlockKernel<valueT><<<num_blocks,blockSize>>>(
+            output,
+            block_sum,
+            size,
+            element_per_block
+        );
+        hipDeviceSynchronize();
+        CHECK_LAST_HIP_ERROR();
+        Spuma::MemoryPool::getInstance()->free(block_sum);
+    }
+
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
