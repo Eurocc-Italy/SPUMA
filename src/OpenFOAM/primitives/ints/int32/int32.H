@@ -74,6 +74,11 @@ struct nameOp<int32_t>
 };
 
 
+FOAM_DEVICE inline int32_t magSqr(const int32_t val)
+{
+    return val*val;
+}
+
 FOAM_DEVICE inline int32_t mag(const int32_t val)
 {
     return ::abs(val);
