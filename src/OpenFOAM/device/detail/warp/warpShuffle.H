@@ -135,10 +135,12 @@ _Pragma("unroll") for (direction cmp = 0; cmp < Type::nComponents; ++cmp) \
 return tmp;                                                               \
 }
 
-SHFL_FUNCS_FOR_VECTORSPACE(vector)
+SHFL_FUNCS_FOR_VECTORSPACE(Vector<double>)
 SHFL_FUNCS_FOR_VECTORSPACE(Vector<label>)
-SHFL_FUNCS_FOR_VECTORSPACE(tensor)
+SHFL_FUNCS_FOR_VECTORSPACE(Vector<float>)
+SHFL_FUNCS_FOR_VECTORSPACE(Tensor<double>)
 SHFL_FUNCS_FOR_VECTORSPACE(Tensor<label>)
+SHFL_FUNCS_FOR_VECTORSPACE(Tensor<float>)
 
 #undef SHFL_FUNCS_FOR_VECTORSPACE
 

@@ -219,7 +219,9 @@ void Foam::cudaExecutor::_backendExclusiveSum
     constexpr size_t element_per_block = element_per_thread * blockSize;
 
     const size_t num_blocks = (size + element_per_block - 1) / element_per_block;
-    const size_t smem_size = element_per_block * sizeof(valueT);
+    // assume blocksize a multiple of the warp size
+    const size_t n_warps = blockSize / cudaDeviceInit::getWarpSize();
+    const size_t smem_size = n_warps * sizeof(valueT);
     valueT* block_sum = nullptr;
     if(num_blocks > 1)
     {

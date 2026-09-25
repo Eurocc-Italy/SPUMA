@@ -82,9 +82,9 @@ public:
 
     static int getSharedMemoryPerBlock()
     {
-        // note use a percentage of max allowable dynamic shared memory 
-        // because driver always reserve some of the total shared memory 
-	// for static allocated object
+        // note use a percentage of max allowable dynamic shared memory
+        // because driver always reserve some of the total shared memory
+	    // for static allocated object
         return prop_.sharedMemPerBlockOptin * sharedMemoryPerBlockPercentage_;
     }
 
@@ -102,6 +102,12 @@ public:
     {
         return nThreadsPerBlock_;
     }
+
+    static int getWarpSize()
+    {
+        return prop_.warpSize;
+    }
+
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
