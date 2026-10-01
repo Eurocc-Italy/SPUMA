@@ -220,6 +220,8 @@ $(derivedFvPatchFields)/timeVaryingMappedFixedValue/timeVaryingMappedFixedValueF
 $(derivedFvPatchFields)/totalPressure/totalPressureFvPatchScalarField.C
 $(derivedFvPatchFields)/totalTemperature/totalTemperatureFvPatchScalarField.C
 $(derivedFvPatchFields)/translatingWallVelocity/translatingWallVelocityFvPatchVectorField.C
+$(derivedFvPatchFields)/turboPressureInletOutletVelocity/turboPressureInletOutletVelocityFvPatchVectorField.C
+$(derivedFvPatchFields)/turboTotal/turboTotalFvPatchScalarField.C
 $(derivedFvPatchFields)/turbulentDFSEMInlet/turbulentDFSEMInletFvPatchVectorField.C
 $(derivedFvPatchFields)/turbulentDFSEMInlet/eddy/eddy.C
 $(derivedFvPatchFields)/turbulentDFSEMInlet/eddy/eddyIO.C
