@@ -129,7 +129,7 @@ public:
         explicit interpolationTable
         (
             const fileName& fName,
-	    const bounds::repeatableBounding = bounds::repeatableBounding::WARN
+            const bounds::repeatableBounding = bounds::repeatableBounding::WARN
         );
 
         //- Construct by reading file name and outOfBounds from dictionary

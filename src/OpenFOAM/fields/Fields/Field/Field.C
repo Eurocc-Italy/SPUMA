@@ -41,7 +41,7 @@ Foam::Field<Type>::Field
     const labelUList& mapAddressing
 )
 :
-    List<Type>(mapAddressing.size(),poolSwitch(1))
+    List<Type>(mapAddressing.size(), poolSwitch(1))
 {
     map(mapF, mapAddressing);
 }
@@ -54,7 +54,7 @@ Foam::Field<Type>::Field
     const labelUList& mapAddressing
 )
 :
-    List<Type>(mapAddressing.size(),poolSwitch(1))
+    List<Type>(mapAddressing.size(), poolSwitch(1))
 {
     map(tmapF, mapAddressing);
 }
@@ -191,6 +191,8 @@ Foam::Field<Type>::Field
     const label len,
     IOobjectOption::readOption readOpt
 )
+:
+    List<Type>(poolSwitch(1))
 {
     if (!Field<Type>::assign(key, dict, len, readOpt))
     {

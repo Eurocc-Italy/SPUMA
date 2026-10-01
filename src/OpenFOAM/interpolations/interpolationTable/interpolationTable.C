@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2019-2020 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -28,6 +29,7 @@ License
 
 #include "interpolationTable.H"
 #include "openFoamTableReader.H"
+#include "deviceErrors.H"
 
 // * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * * //
 
@@ -89,7 +91,7 @@ Foam::interpolationTable<Type>::interpolationTable
     const bounds::repeatableBounding bounding
 )
 :
-    List<value_type>(),
+    List<value_type>(poolSwitch(1)),
     bounding_(bounding),
     fileName_(fName),
     reader_(new openFoamTableReader<Type>())
@@ -343,18 +345,21 @@ Type Foam::interpolationTable<Type>::interpolateValue
         {
             case bounds::repeatableBounding::ERROR:
             {
-                FatalErrorInFunction
-                    << "value (" << lookupValue << ") less than lower "
-                    << "bound (" << minLimit << ")\n"
-                    << exit(FatalError);
+                fatalErrorInKernelFunction
+                (
+                    "value (%f) less than lower bound (%f)\n", 
+                    lookupValue, minLimit
+                )
                 break;
             }
             case bounds::repeatableBounding::WARN:
             {
-                WarningInFunction
-                    << "value (" << lookupValue << ") less than lower "
-                    << "bound (" << minLimit << ")\n"
-                    << "    Continuing with the first entry" << endl;
+                warningInKernelFunction
+                (
+                    "value (%f) less than lower bound (%f)\n"
+                    "    Continuing with the first entry\n",
+                    lookupValue, minLimit
+                )
 
                 // Behaviour as per CLAMP
                 return list.first().second();
@@ -380,18 +385,21 @@ Type Foam::interpolationTable<Type>::interpolateValue
         {
             case bounds::repeatableBounding::ERROR:
             {
-                FatalErrorInFunction
-                    << "value (" << lookupValue << ") greater than upper "
-                    << "bound (" << maxLimit << ")\n"
-                    << exit(FatalError);
+                fatalErrorInKernelFunction
+                (
+                    "value (%f) greater than upper bound (%f)\n", 
+                    lookupValue, maxLimit
+                )
                 break;
             }
             case bounds::repeatableBounding::WARN:
             {
-                WarningInFunction
-                    << "value (" << lookupValue << ") greater than upper "
-                    << "bound (" << maxLimit << ")\n"
-                    << "    Continuing with the last entry" << endl;
+                warningInKernelFunction
+                (
+                    "value (%f) greater than upper bound (%f)\n"
+                    "    Continuing with the last entry\n",
+                    lookupValue, maxLimit
+                )
 
                 // Behaviour as per 'CLAMP'
                 return list.last().second();
