@@ -29,27 +29,44 @@ namespace Foam
 {
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertMomentumEquation
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    fvVectorMatrix& matrix
+    fvVectorMatrix& matrix,
+    const label row,
+    const label col
 );
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertPressureEquation
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    fvScalarMatrix& matrix
+    fvScalarMatrix& matrix,
+    const label row,
+    const label col
 );
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertVelocityPressureCoupling
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    const fvBlockMatrix<vector, vector>& matrix
+    const fvBlockMatrix<vector, vector>& matrix,
+    const label row,
+    const label col
 );
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertPressureVelocityCoupling
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    const fvBlockMatrix<scalar, vector>& matrix
+    const fvBlockMatrix<scalar, vector>& matrix,
+    const label row,
+    const label col
+);
+
+template<>
+SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
+(
+    GeometricField<vector, fvPatchField, volMesh>& U,
+    const label UCmpt,
+    GeometricField<scalar, fvPatchField, volMesh>& p,
+    const label pCmpt
 );
 
 } // End namespace Foam

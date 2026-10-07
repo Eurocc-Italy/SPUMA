@@ -188,18 +188,41 @@ public:
             fvMatrix<sourceType>& matrix
         );
 
-        void insertMomentumEquation(fvVectorMatrix& matrix);
-
-        void insertPressureEquation(fvScalarMatrix& matrix);
-
-        void insertVelocityPressureCoupling
+        void insertEquation
         (
-            const fvBlockMatrix<vector, vector>& matrix
+            fvVectorMatrix& matrix,
+            const label row,
+            const label col
         );
 
-        void insertPressureVelocityCoupling
+        void insertEquation
         (
-            const fvBlockMatrix<scalar, vector>& matrix
+            fvScalarMatrix& matrix,
+            const label row,
+            const label col
+        );
+
+        void insertEquation
+        (
+            const fvBlockMatrix<vector, vector>& matrix,
+            const label row,
+            const label col
+        );
+
+        void insertEquation
+        (
+            const fvBlockMatrix<scalar, vector>& matrix,
+            const label row,
+            const label col
+        );
+
+        //- Solve the coupled system and unpack the solution into U and p
+        SolverPerformance<sourceType> solve
+        (
+            GeometricField<vector, fvPatchField, volMesh>& U,
+            const label UCmpt,
+            GeometricField<scalar, fvPatchField, volMesh>& p,
+            const label pCmpt
         );
 
         template<class psiType>

@@ -21,16 +21,28 @@ License
 
 #include "fvBlockMatrix.H"
 #include "fvScalarMatrix.H"
+#include "lduCalculatedProcessorField.H"
+#include "lduCalculatedCyclicField.H"
+#include "labelVector.H"
 
 namespace Foam
 {
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertMomentumEquation
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    fvVectorMatrix& matrix
+    fvVectorMatrix& matrix,
+    const label row,
+    const label col
 )
 {
+    if (row < 0 || row + 3 > 4 || col < 0 || col + 3 > 4)
+    {
+        FatalErrorInFunction
+            << "Cannot insert a 3x3 equation block at ("
+            << row << ',' << col << ") in a tensor4" << abort(FatalError);
+    }
+
     vectorField source(matrix.source());
     forAll(matrix.psi().boundaryField(), patchi)
     {
@@ -64,8 +76,8 @@ void fvBlockMatrix<vector4, tensor4>::insertMomentumEquation
 
         forAll(blockDiag, celli)
         {
-            blockDiag[celli](cmpt, cmpt) = diag[celli];
-            blockSource[celli][cmpt] += source[celli][cmpt];
+            blockDiag[celli](row + cmpt, col + cmpt) = diag[celli];
+            blockSource[celli][row + cmpt] += source[celli][cmpt];
         }
     }
 
@@ -78,21 +90,22 @@ void fvBlockMatrix<vector4, tensor4>::insertMomentumEquation
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                blockUpper[facei](cmpt, cmpt) = upper[facei];
+                blockUpper[facei](row + cmpt, col + cmpt) = upper[facei];
             }
         }
     }
 
-    if (matrix.hasLower())
+    if (matrix.hasLower() || matrix.hasUpper())
     {
-        const scalarField& lower = matrix.lower();
+        // Symmetric matrices store only upper: const lower() returns it
+        const scalarField& lower = std::as_const(matrix).lower();
         Field<tensor4>& blockLower = this->lower();
 
         forAll(lower, facei)
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                blockLower[facei](cmpt, cmpt) = lower[facei];
+                blockLower[facei](row + cmpt, col + cmpt) = lower[facei];
             }
         }
     }
@@ -127,8 +140,10 @@ void fvBlockMatrix<vector4, tensor4>::insertMomentumEquation
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                patchUpper[facei](cmpt, cmpt) = -boundary[facei][cmpt];
-                patchLower[facei](cmpt, cmpt) = internal[facei][cmpt];
+                patchUpper[facei](row + cmpt, col + cmpt) =
+                    -boundary[facei][cmpt];
+                patchLower[facei](row + cmpt, col + cmpt) =
+                    internal[facei][cmpt];
             }
         }
     }
@@ -136,11 +151,20 @@ void fvBlockMatrix<vector4, tensor4>::insertMomentumEquation
 
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertPressureEquation
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    fvScalarMatrix& matrix
+    fvScalarMatrix& matrix,
+    const label row,
+    const label col
 )
 {
+    if (row < 0 || row >= 4 || col < 0 || col >= 4)
+    {
+        FatalErrorInFunction
+            << "Cannot insert a 1x1 equation block at ("
+            << row << ',' << col << ") in a tensor4" << abort(FatalError);
+    }
+
     scalarField diag(matrix.diag());
     scalarField source(matrix.source());
 
@@ -169,8 +193,8 @@ void fvBlockMatrix<vector4, tensor4>::insertPressureEquation
 
     forAll(blockDiag, celli)
     {
-        blockDiag[celli](3, 3) = diag[celli];
-        blockSource[celli][3] += source[celli];
+        blockDiag[celli](row, col) = diag[celli];
+        blockSource[celli][row] += source[celli];
     }
 
     if (matrix.hasUpper())
@@ -180,18 +204,19 @@ void fvBlockMatrix<vector4, tensor4>::insertPressureEquation
 
         forAll(upper, facei)
         {
-            blockUpper[facei](3, 3) = upper[facei];
+            blockUpper[facei](row, col) = upper[facei];
         }
     }
 
-    if (matrix.hasLower())
+    if (matrix.hasLower() || matrix.hasUpper())
     {
-        const scalarField& lower = matrix.lower();
+        // Symmetric matrices store only upper: const lower() returns it
+        const scalarField& lower = std::as_const(matrix).lower();
         Field<tensor4>& blockLower = this->lower();
 
         forAll(lower, facei)
         {
-            blockLower[facei](3, 3) = lower[facei];
+            blockLower[facei](row, col) = lower[facei];
         }
     }
 
@@ -223,19 +248,28 @@ void fvBlockMatrix<vector4, tensor4>::insertPressureEquation
 
         forAll(internal, facei)
         {
-            patchUpper[facei](3, 3) = -boundary[facei];
-            patchLower[facei](3, 3) = internal[facei];
+            patchUpper[facei](row, col) = -boundary[facei];
+            patchLower[facei](row, col) = internal[facei];
         }
     }
 }
 
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertVelocityPressureCoupling
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    const fvBlockMatrix<vector, vector>& matrix
+    const fvBlockMatrix<vector, vector>& matrix,
+    const label row,
+    const label col
 )
 {
+    if (row < 0 || row + 3 > 4 || col < 0 || col >= 4)
+    {
+        FatalErrorInFunction
+            << "Cannot insert a 3x1 equation block at ("
+            << row << ',' << col << ") in a tensor4" << abort(FatalError);
+    }
+
     Field<tensor4>& blockDiag = this->diag();
     Field<tensor4>& blockUpper = this->upper();
     Field<tensor4>& blockLower = this->lower();
@@ -245,8 +279,8 @@ void fvBlockMatrix<vector4, tensor4>::insertVelocityPressureCoupling
     {
         for (direction cmpt = 0; cmpt < 3; ++cmpt)
         {
-            blockDiag[celli](cmpt, 3) = matrix.diag()[celli][cmpt];
-            blockSource[celli][cmpt] += matrix.source()[celli][cmpt];
+            blockDiag[celli](row + cmpt, col) = matrix.diag()[celli][cmpt];
+            blockSource[celli][row + cmpt] += matrix.source()[celli][cmpt];
         }
     }
 
@@ -254,8 +288,8 @@ void fvBlockMatrix<vector4, tensor4>::insertVelocityPressureCoupling
     {
         for (direction cmpt = 0; cmpt < 3; ++cmpt)
         {
-            blockUpper[facei](cmpt, 3) = matrix.upper()[facei][cmpt];
-            blockLower[facei](cmpt, 3) = matrix.lower()[facei][cmpt];
+            blockUpper[facei](row + cmpt, col) = matrix.upper()[facei][cmpt];
+            blockLower[facei](row + cmpt, col) = matrix.lower()[facei][cmpt];
         }
     }
 
@@ -290,9 +324,9 @@ void fvBlockMatrix<vector4, tensor4>::insertVelocityPressureCoupling
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                this->interfacesUpper()[patchi][facei](cmpt, 3) =
+                this->interfacesUpper()[patchi][facei](row + cmpt, col) =
                     matrix.interfacesUpper()[patchi][facei][cmpt];
-                this->interfacesLower()[patchi][facei](cmpt, 3) =
+                this->interfacesLower()[patchi][facei](row + cmpt, col) =
                     matrix.interfacesLower()[patchi][facei][cmpt];
             }
         }
@@ -301,11 +335,20 @@ void fvBlockMatrix<vector4, tensor4>::insertVelocityPressureCoupling
 
 
 template<>
-void fvBlockMatrix<vector4, tensor4>::insertPressureVelocityCoupling
+void fvBlockMatrix<vector4, tensor4>::insertEquation
 (
-    const fvBlockMatrix<scalar, vector>& matrix
+    const fvBlockMatrix<scalar, vector>& matrix,
+    const label row,
+    const label col
 )
 {
+    if (row < 0 || row >= 4 || col < 0 || col + 3 > 4)
+    {
+        FatalErrorInFunction
+            << "Cannot insert a 1x3 equation block at ("
+            << row << ',' << col << ") in a tensor4" << abort(FatalError);
+    }
+
     Field<tensor4>& blockDiag = this->diag();
     Field<tensor4>& blockUpper = this->upper();
     Field<tensor4>& blockLower = this->lower();
@@ -315,17 +358,17 @@ void fvBlockMatrix<vector4, tensor4>::insertPressureVelocityCoupling
     {
         for (direction cmpt = 0; cmpt < 3; ++cmpt)
         {
-            blockDiag[celli](3, cmpt) = matrix.diag()[celli][cmpt];
+            blockDiag[celli](row, col + cmpt) = matrix.diag()[celli][cmpt];
         }
-        blockSource[celli][3] += matrix.source()[celli];
+        blockSource[celli][row] += matrix.source()[celli];
     }
 
     forAll(blockUpper, facei)
     {
         for (direction cmpt = 0; cmpt < 3; ++cmpt)
         {
-            blockUpper[facei](3, cmpt) = matrix.upper()[facei][cmpt];
-            blockLower[facei](3, cmpt) = matrix.lower()[facei][cmpt];
+            blockUpper[facei](row, col + cmpt) = matrix.upper()[facei][cmpt];
+            blockLower[facei](row, col + cmpt) = matrix.lower()[facei][cmpt];
         }
     }
 
@@ -360,13 +403,159 @@ void fvBlockMatrix<vector4, tensor4>::insertPressureVelocityCoupling
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                this->interfacesUpper()[patchi][facei](3, cmpt) =
+                this->interfacesUpper()[patchi][facei](row, col + cmpt) =
                     matrix.interfacesUpper()[patchi][facei][cmpt];
-                this->interfacesLower()[patchi][facei](3, cmpt) =
+                this->interfacesLower()[patchi][facei](row, col + cmpt) =
                     matrix.interfacesLower()[patchi][facei][cmpt];
             }
         }
     }
+}
+
+
+template<>
+SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
+(
+    GeometricField<vector, fvPatchField, volMesh>& U,
+    const label UCmpt,
+    GeometricField<scalar, fvPatchField, volMesh>& p,
+    const label pCmpt
+)
+{
+    if (UCmpt < 0 || UCmpt + 3 > 4 || pCmpt < 0 || pCmpt >= 4)
+    {
+        FatalErrorInFunction
+            << "Cannot solve for U at " << UCmpt << " and p at " << pCmpt
+            << " in a vector4" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = U.mesh();
+
+    Field<vector4> psi(mesh.nCells(), vector4(Zero));
+
+    forAll(psi, celli)
+    {
+        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        {
+            psi[celli][UCmpt + cmpt] = U[celli][cmpt];
+        }
+        psi[celli][pCmpt] = p[celli];
+    }
+
+    const lduInterfacePtrsList meshInterfaces = mesh.interfaces();
+    PtrList<lduCalculatedProcessorField<vector4>> processorInterfaces
+    (
+        meshInterfaces.size()
+    );
+    PtrList<lduCalculatedCyclicField<vector4>> cyclicInterfaces
+    (
+        meshInterfaces.size()
+    );
+    this->interfaces().resize(meshInterfaces.size());
+
+    forAll(meshInterfaces, patchi)
+    {
+        if (!meshInterfaces.set(patchi))
+        {
+            continue;
+        }
+
+        if (isA<processorLduInterface>(meshInterfaces[patchi]))
+        {
+            processorInterfaces.set
+            (
+                patchi,
+                new lduCalculatedProcessorField<vector4>
+                (
+                    meshInterfaces[patchi],
+                    refCast<const processorLduInterfaceField>
+                    (
+                        U.boundaryField()[patchi]
+                    )
+                )
+            );
+            this->interfaces().set(patchi, &processorInterfaces[patchi]);
+        }
+        else if (isA<cyclicLduInterface>(meshInterfaces[patchi]))
+        {
+            cyclicInterfaces.set
+            (
+                patchi,
+                new lduCalculatedCyclicField<vector4>
+                (
+                    meshInterfaces[patchi],
+                    refCast<const cyclicLduInterfaceField>
+                    (
+                        U.boundaryField()[patchi]
+                    )
+                )
+            );
+            this->interfaces().set(patchi, &cyclicInterfaces[patchi]);
+        }
+    }
+
+    const word solverName(U.name() + p.name());
+
+    autoPtr<LduMatrix<vector4, tensor4, tensor4>::solver> UpSolver =
+        LduMatrix<vector4, tensor4, tensor4>::solver::New
+        (
+            solverName,
+            *this,
+            mesh.solverDict(solverName)
+        );
+
+    const SolverPerformance<vector4> solverPerf = UpSolver->solve(psi);
+
+    Info<< solverPerf << nl;
+
+    // Store per-field performance so residualControl and solverInfo see U, p
+    const vector4& iRes = solverPerf.initialResidual();
+    const vector4& fRes = solverPerf.finalResidual();
+    const Vector4<label>& nIter = solverPerf.nIterations();
+
+    mesh.data().setSolverPerformance
+    (
+        U.name(),
+        SolverPerformance<vector>
+        (
+            solverPerf.solverName(),
+            U.name(),
+            vector(iRes[UCmpt], iRes[UCmpt + 1], iRes[UCmpt + 2]),
+            vector(fRes[UCmpt], fRes[UCmpt + 1], fRes[UCmpt + 2]),
+            labelVector(nIter[UCmpt], nIter[UCmpt + 1], nIter[UCmpt + 2]),
+            solverPerf.converged(),
+            solverPerf.singular()
+        )
+    );
+
+    mesh.data().setSolverPerformance
+    (
+        p.name(),
+        SolverPerformance<scalar>
+        (
+            solverPerf.solverName(),
+            p.name(),
+            iRes[pCmpt],
+            fRes[pCmpt],
+            nIter[pCmpt],
+            solverPerf.converged(),
+            solverPerf.singular()
+        )
+    );
+
+    forAll(psi, celli)
+    {
+        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        {
+            U[celli][cmpt] = psi[celli][UCmpt + cmpt];
+        }
+        p[celli] = psi[celli][pCmpt];
+    }
+
+    U.correctBoundaryConditions();
+    p.correctBoundaryConditions();
+
+    return solverPerf;
 }
 
 } // End namespace Foam

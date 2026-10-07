@@ -31,8 +31,12 @@ Group
     grpIncompressibleSolvers
 
 Description
-    Steady-state incompressible solver scaffold for a directly assembled
-    vector4 pressure-velocity block system.
+    Steady-state incompressible solver with implicit pressure-velocity
+    coupling in a vector4 block system.
+
+    The Rhie-Chow flux is selected with the fvSolution entry rhieChow:
+    coupled (default, interpolate(rAU)*interpolate(grad(p))) or segregated
+    (flux(rAU*grad(p)) with rAU of the relaxed UEqn, as simpleFoam).
 
 \*---------------------------------------------------------------------------*/
 
@@ -69,6 +73,20 @@ int main(int argc, char *argv[])
 
     const scalar pAlpha = mesh.solutionDict().getOrDefault("pAlpha", 1.0);
 
+    const word rhieChow
+    (
+        mesh.solutionDict().getOrDefault<word>("rhieChow", "coupled")
+    );
+
+    if (rhieChow != "coupled" && rhieChow != "segregated")
+    {
+        FatalIOErrorInFunction(mesh.solutionDict())
+            << "Unknown rhieChow " << rhieChow
+            << ", valid options: coupled segregated" << exit(FatalIOError);
+    }
+
+    const bool segregatedRhieChow = (rhieChow == "segregated");
+
     turbulence->validate();
 
     Info<< "\nStarting time loop\n" << endl;
@@ -77,53 +95,28 @@ int main(int argc, char *argv[])
     {
         Info<< "Time = " << runTime.timeName() << nl << endl;
 
-        // Work in progress: assemble the vector4/tensor4 coupled system
-        // to exercise the new insertion functions before adding the solve.
         fvBlockMatrix<vector4, tensor4> UpEqn(mesh);
 
-        // Assemble the momentum equation
-        fvVectorMatrix UEqn
-        (
-                fvm::div(phi, U)
-            + turbulence->divDevReff(U)
-            - fvOptions(U)
-        );
+        #include "UEqn.H"
+        #include "pEqn.H"
+        #include "couplingTerms.H"
 
-        // Store the reciprocal momentum diagonal before relaxation
-        volScalarField rAU(1.0/UEqn.A());
+        UpEqn.solve(U, 0, p, 3);
 
-        // Relax and insert the momentum block
-        UEqn.relax();
-        UpEqn.insertMomentumEquation(UEqn);
+        phi = (fvc::interpolate(U) & mesh.Sf()) + pEqn.flux() + presSource;
 
-        // Build the Rhie-Chow pressure-correction source
-        surfaceScalarField presSource
-        (
-                "presSource",
-                pAlpha*fvc::interpolate(rAU)
-             *(fvc::interpolate(fvc::grad(p)) & mesh.Sf())
-        );
+        #include "continuityErrs.H"
 
-        // Assemble the pressure equation
-        fvScalarMatrix pEqn
-        (
-            - pAlpha*fvm::laplacian(rAU, p)
-         ==
-            - fvc::div(presSource)
-        );
+        fvOptions.correct(U);
+        fvOptions.correct(p);
 
-        // Set the pressure reference and insert the pressure block
-        pEqn.setReference(pRefCell, pRefValue);
-        UpEqn.insertPressureEquation(pEqn);
+        laminarTransport.correct();
+        turbulence->correct();
 
-        // Assemble the off-diagonal pressure-velocity coupling blocks
-        fvBlockMatrix<vector, vector> dUByp(fvm::grad(p));
-        fvBlockMatrix<scalar, vector> dpByU(fvm::div(U));
+        runTime.write();
 
-        UpEqn.insertVelocityPressureCoupling(dUByp);
-        UpEqn.insertPressureVelocityCoupling(dpByU);
-
-        // Assembly-only test: U and p are intentionally not updated yet.
+        #include "poolOccupancy.H"
+        runTime.printExecutionTime(Info);
     }
 
     #include "poolMaxOccupancy.H"
