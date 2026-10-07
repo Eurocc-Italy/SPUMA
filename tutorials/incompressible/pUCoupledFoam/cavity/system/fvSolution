@@ -1,0 +1,56 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     |                                                 |
+|   \\  /    A nd           |                                                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+
+pAlpha         1;
+
+// coupled: interpolate(rAU)*interpolate(grad(p)) (ICSFoam)
+// segregated: flux(rAU*grad(p)), rAU of the relaxed UEqn (as simpleFoam)
+rhieChow       coupled;
+
+solvers
+{
+    Up
+    {
+        solver          PBiCGStab;
+        preconditioner  none;
+        tolerance       (1e-15 1e-15 1e-15 1e-15);
+        relTol          (0 0 0 0);
+        minIter         1;
+        maxIter         5000;
+    }
+}
+
+SIMPLE
+{
+    nNonOrthogonalCorrectors 0;
+    pRefCell        0;
+    pRefValue       0;
+
+    residualControl
+    {
+        U           1e-12;
+        p           1e-12;
+    }
+}
+
+relaxationFactors
+{
+    equations
+    {
+        U           1;
+    }
+}
+
+// ************************************************************************* //
