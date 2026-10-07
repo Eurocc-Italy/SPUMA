@@ -322,6 +322,8 @@ fvMatrices/fvBlockMatrix/fvBlockMatrixOperators.C
 fvMatrices/fvBlockMatrix/fvBlockMatrixScalarScalarMatrix.C
 fvMatrices/fvBlockMatrix/fvBlockMatrixTensorVectorMatrix.C
 fvMatrices/fvBlockMatrix/fvBlockMatrixVector4Tensor4Matrix.C
+fvMatrices/fvBlockMatrix/vector4ProcessorInterfaceField.C
+fvMatrices/fvBlockMatrix/vector4CyclicInterfaceField.C
 fvMatrices/solvers/MULES/MULES.C
 fvMatrices/solvers/GAMGSymSolver/GAMGAgglomerations/faceAreaPairGAMGAgglomeration/faceAreaPairGAMGAgglomeration.C
 

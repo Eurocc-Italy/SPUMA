@@ -27,7 +27,6 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "lduCalculatedProcessorField.H"
-#include "vector4.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -38,23 +37,7 @@ Foam::lduCalculatedProcessorField<Type>::lduCalculatedProcessorField
 )
 :
     LduInterfaceField<Type>(interface),
-    procInterface_(refCast<const processorLduInterface>(interface)),
-    doTransform_(false),
-    sendRequest_(-1),
-    recvRequest_(-1)
-{}
-
-
-template<class Type>
-Foam::lduCalculatedProcessorField<Type>::lduCalculatedProcessorField
-(
-    const lduInterface& interface,
-    const processorLduInterfaceField& field
-)
-:
-    LduInterfaceField<Type>(interface),
-    procInterface_(refCast<const processorLduInterface>(interface)),
-    doTransform_(field.doTransform()),
+    procInterface_(refCast<const lduPrimitiveProcessorInterface>(interface)),
     sendRequest_(-1),
     recvRequest_(-1)
 {}
@@ -68,7 +51,6 @@ Foam::lduCalculatedProcessorField<Type>::lduCalculatedProcessorField
 :
     LduInterfaceField<Type>(refCast<const lduInterface>(ptf)),
     procInterface_(ptf.procInterface_),
-    doTransform_(ptf.doTransform_),
     sendRequest_(-1),
     recvRequest_(-1)
 {}
@@ -93,188 +75,6 @@ bool Foam::lduCalculatedProcessorField<Type>::ready() const
         if (UPstream::finishedRequest(sendRequest_)) sendRequest_ = -1;
     }
     return ok;
-}
-
-
-template<class Type>
-void Foam::lduCalculatedProcessorField<Type>::initFieldTransfer
-(
-    const lduAddressing& lduAddr,
-    const label patchId,
-    const Field<Type>& psiInternal
-) const
-{
-    if (!this->all_ready())
-    {
-        FatalErrorInFunction
-            << "Outstanding request(s) on interface "
-            << abort(FatalError);
-    }
-
-    const labelUList& fc = lduAddr.patchAddr(patchId);
-
-    sendBuf_.resize_nocopy(fc.size());
-    recvBuf_.resize_nocopy(fc.size());
-
-    foamExecutor exec;
-    auto sendBufp = sendBuf_.begin();
-    const auto psiInternalp = psiInternal.cbegin();
-    const auto fcp = fc.cbegin();
-    auto Lambda = [=](label i)
-    {
-        sendBufp[i] = psiInternalp[fcp[i]];
-    };
-    exec.parallelFor(Lambda, fc.size());
-
-    recvRequest_ = UPstream::nRequests();
-    UIPstream::read
-    (
-        UPstream::commsTypes::nonBlocking,
-        procInterface_.neighbProcNo(),
-        recvBuf_,
-        procInterface_.tag(),
-        procInterface_.comm()
-    );
-
-    sendRequest_ = UPstream::nRequests();
-    UOPstream::write
-    (
-        UPstream::commsTypes::nonBlocking,
-        procInterface_.neighbProcNo(),
-        sendBuf_,
-        procInterface_.tag(),
-        procInterface_.comm()
-    );
-
-    this->updatedMatrix(false);
-}
-
-
-template<class Type>
-void Foam::lduCalculatedProcessorField<Type>::initInterfaceMatrixUpdate
-(
-    Field<Type>&,
-    const bool,
-    const lduAddressing& lduAddr,
-    const label patchId,
-    const Field<Type>& psiInternal,
-    const scalarField&,
-    const Pstream::commsTypes
-) const
-{
-    initFieldTransfer(lduAddr, patchId, psiInternal);
-}
-
-
-template<class Type>
-void Foam::lduCalculatedProcessorField<Type>::initInterfaceMatrixUpdate
-(
-    Field<Type>&,
-    const bool,
-    const lduAddressing& lduAddr,
-    const label patchId,
-    const Field<Type>& psiInternal,
-    const Field<tensor4>&,
-    const Pstream::commsTypes
-) const
-{
-    initFieldTransfer(lduAddr, patchId, psiInternal);
-}
-
-
-template<class Type>
-void Foam::lduCalculatedProcessorField<Type>::updateInterfaceMatrix
-(
-    Field<Type>& result,
-    const bool add,
-    const lduAddressing&,
-    const label,
-    const Field<Type>&,
-    const scalarField& coeffs,
-    const Pstream::commsTypes
-) const
-{
-    if (this->updatedMatrix())
-    {
-        return;
-    }
-
-    UPstream::waitRequest(recvRequest_);
-    recvRequest_ = -1;
-    if (UPstream::finishedRequest(sendRequest_)) sendRequest_ = -1;
-
-    const labelUList& faceCells = this->interface().faceCells();
-    const label nFaces = min
-    (
-        faceCells.size(),
-        min(coeffs.size(), recvBuf_.size())
-    );
-
-    for (label facei = 0; facei < nFaces; ++facei)
-    {
-        if (add)
-        {
-            result[faceCells[facei]] -= coeffs[facei]*recvBuf_[facei];
-        }
-        else
-        {
-            result[faceCells[facei]] += coeffs[facei]*recvBuf_[facei];
-        }
-    }
-
-    this->updatedMatrix(true);
-}
-
-
-template<class Type>
-void Foam::lduCalculatedProcessorField<Type>::updateInterfaceMatrix
-(
-    Field<Type>& result,
-    const bool add,
-    const lduAddressing&,
-    const label,
-    const Field<Type>&,
-    const Field<tensor4>& coeffs,
-    const Pstream::commsTypes
-) const
-{
-    if constexpr
-    (
-        std::is_same<Type, vector4>::value
-    )
-    {
-        if (this->updatedMatrix())
-        {
-            return;
-        }
-
-        UPstream::waitRequest(recvRequest_);
-        recvRequest_ = -1;
-        if (UPstream::finishedRequest(sendRequest_)) sendRequest_ = -1;
-
-        processorLduInterfaceField::transformCoupleField(recvBuf_);
-
-        const labelUList& faceCells = this->interface().faceCells();
-        const label nFaces = min
-        (
-            faceCells.size(),
-            min(coeffs.size(), recvBuf_.size())
-        );
-
-        for (label facei = 0; facei < nFaces; ++facei)
-        {
-            if (add)
-            {
-                result[faceCells[facei]] += dot(coeffs[facei], recvBuf_[facei]);
-            }
-            else
-            {
-                result[faceCells[facei]] -= dot(coeffs[facei], recvBuf_[facei]);
-            }
-        }
-
-        this->updatedMatrix(true);
-    }
 }
 
 
@@ -351,7 +151,7 @@ void Foam::lduCalculatedProcessorField<Type>::addToInternalField
     const solveScalarField& vals
 ) const
 {
-    const labelUList& faceCells = this->interface().faceCells();
+    const labelUList& faceCells = this->procInterface_.faceCells();
 
     foamExecutor exec;
     auto resultp = result.begin();

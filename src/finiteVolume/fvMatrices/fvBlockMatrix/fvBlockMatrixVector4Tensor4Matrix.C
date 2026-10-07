@@ -21,8 +21,8 @@ License
 
 #include "fvBlockMatrix.H"
 #include "fvScalarMatrix.H"
-#include "lduCalculatedProcessorField.H"
-#include "lduCalculatedCyclicField.H"
+#include "vector4ProcessorInterfaceField.H"
+#include "vector4CyclicInterfaceField.H"
 #include "labelVector.H"
 
 namespace Foam
@@ -443,11 +443,11 @@ SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
     }
 
     const lduInterfacePtrsList meshInterfaces = mesh.interfaces();
-    PtrList<lduCalculatedProcessorField<vector4>> processorInterfaces
+    PtrList<vector4ProcessorInterfaceField> processorInterfaces
     (
         meshInterfaces.size()
     );
-    PtrList<lduCalculatedCyclicField<vector4>> cyclicInterfaces
+    PtrList<vector4CyclicInterfaceField> cyclicInterfaces
     (
         meshInterfaces.size()
     );
@@ -465,7 +465,7 @@ SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
             processorInterfaces.set
             (
                 patchi,
-                new lduCalculatedProcessorField<vector4>
+                new vector4ProcessorInterfaceField
                 (
                     meshInterfaces[patchi],
                     refCast<const processorLduInterfaceField>
@@ -481,7 +481,7 @@ SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
             cyclicInterfaces.set
             (
                 patchi,
-                new lduCalculatedCyclicField<vector4>
+                new vector4CyclicInterfaceField
                 (
                     meshInterfaces[patchi],
                     refCast<const cyclicLduInterfaceField>
