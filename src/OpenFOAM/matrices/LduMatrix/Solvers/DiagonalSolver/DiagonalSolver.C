@@ -27,6 +27,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "DiagonalSolver.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -77,6 +79,14 @@ Foam::DiagonalSolver<Type, DType, LUType>::solve
         if constexpr(std::is_same<DType, Type>::value)
         {
             psiPtr[celli] = cmptDivide(sourcePtr[celli], diagPtr[celli]);
+        }
+        else if constexpr
+        (
+            std::is_same<Type, vector4>::value
+         && std::is_same<DType, tensor4>::value
+        )
+        {
+            psiPtr[celli] = ::Foam::solve(diagPtr[celli], sourcePtr[celli]);
         }
         else
         {

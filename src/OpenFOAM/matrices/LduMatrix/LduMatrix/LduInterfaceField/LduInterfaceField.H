@@ -42,6 +42,7 @@ SourceFiles
 #include "lduInterfaceField.H"
 #include "primitiveFieldsFwd.H"
 #include "Pstream.H"
+#include "tensor4.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -109,6 +110,19 @@ public:
             ) const
             {}
 
+            //- Initialise neighbour matrix update for block coefficients
+            virtual void initInterfaceMatrixUpdate
+            (
+                Field<Type>&,
+                const bool,
+                const lduAddressing&,
+                const label,
+                const Field<Type>&,
+                const Field<tensor4>&,
+                const Pstream::commsTypes
+            ) const
+            {}
+
             //- Inherit updateInterfaceMatrix from lduInterfaceField
             using lduInterfaceField::updateInterfaceMatrix;
 
@@ -123,6 +137,19 @@ public:
                 const scalarField&,
                 const Pstream::commsTypes commsType
             ) const = 0;
+
+            //- Update result field using block coefficients
+            virtual void updateInterfaceMatrix
+            (
+                Field<Type>&,
+                const bool,
+                const lduAddressing&,
+                const label,
+                const Field<Type>&,
+                const Field<tensor4>&,
+                const Pstream::commsTypes
+            ) const
+            {}
 };
 
 

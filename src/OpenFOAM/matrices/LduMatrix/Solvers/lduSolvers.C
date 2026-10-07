@@ -28,8 +28,11 @@ License
 #include "PCICG.H"
 #include "PBiCCCG.H"
 #include "PBiCICG.H"
+#include "TPBiCGStab.H"
 #include "SmoothSolver.H"
 #include "fieldTypes.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 #define makeLduSolvers(Type, DType, LUType)                                    \
                                                                                \
@@ -45,6 +48,10 @@ License
                                                                                \
     makeLduSolver(PBiCICG, Type, DType, LUType);                               \
     makeLduAsymSolver(PBiCICG, Type, DType, LUType);                           \
+                                                                               \
+    makeLduSolver(TPBiCGStab, Type, DType, LUType);                            \
+    makeLduSymSolver(TPBiCGStab, Type, DType, LUType);                         \
+    makeLduAsymSolver(TPBiCGStab, Type, DType, LUType);                        \
                                                                                \
     makeLduSolver(SmoothSolver, Type, DType, LUType);                          \
     makeLduSymSolver(SmoothSolver, Type, DType, LUType);                       \
@@ -62,6 +69,13 @@ namespace Foam
     makeLduSolvers(sphericalTensor, sphericalTensor, scalar);
     makeLduSolvers(symmTensor, symmTensor, scalar);
     makeLduSolvers(tensor, tensor, scalar);
+
+    makeLduSolver(DiagonalSolver, vector4, tensor4, tensor4);
+    makeLduSymSolver(DiagonalSolver, vector4, tensor4, tensor4);
+    makeLduAsymSolver(DiagonalSolver, vector4, tensor4, tensor4);
+    makeLduSolver(TPBiCGStab, vector4, tensor4, tensor4);
+    makeLduSymSolver(TPBiCGStab, vector4, tensor4, tensor4);
+    makeLduAsymSolver(TPBiCGStab, vector4, tensor4, tensor4);
 };
 
 

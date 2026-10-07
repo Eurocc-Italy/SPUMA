@@ -28,6 +28,8 @@ License
 
 #include "LduMatrix.H"
 #include "DiagonalSolver.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -186,10 +188,22 @@ Type Foam::LduMatrix<Type, DType, LUType>::solver::normFactor
         case lduMatrix::normTypes::L1_SCALED_NORM :
         {
             // --- Calculate A dot reference value of psi
-            matrix_.sumA(tmpField);
-            cmptMultiply(tmpField, tmpField, gAverage(psi));
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                Field<Type> reference(psi.size(), gAverage(psi));
+                matrix_.Amul(tmpField, reference);
+            }
+            else
+            {
+                matrix_.sumA(tmpField);
+                cmptMultiply(tmpField, tmpField, gAverage(psi));
+            }
 
-            return stabilise
+            const auto stabilisedNorm = stabilise
             (
                 gSum
                 (
@@ -198,6 +212,22 @@ Type Foam::LduMatrix<Type, DType, LUType>::solver::normFactor
                 ),
                 SolverPerformance<Type>::small_
             );
+
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                return Type
+                (
+                    pTraits<Type>::one*cmptSum(stabilisedNorm)
+                );
+            }
+            else
+            {
+                return stabilisedNorm;
+            }
 
             // Equivalent at convergence:
             // return stabilise

@@ -45,7 +45,7 @@ SourceFiles
 #ifndef Foam_lduCalculatedProcessorField_H
 #define Foam_lduCalculatedProcessorField_H
 
-#include "lduPrimitiveProcessorInterface.H"
+#include "processorLduInterface.H"
 #include "processorLduInterfaceField.H"
 #include "LduInterfaceField.H"
 
@@ -69,7 +69,10 @@ protected:
     // Protected Data
 
         //- Local reference cast into the interface
-        const lduPrimitiveProcessorInterface& procInterface_;
+        const processorLduInterface& procInterface_;
+
+        //- Is the transform required
+        bool doTransform_;
 
 
         // Sending and receiving
@@ -103,6 +106,13 @@ protected:
             const solveScalarField& vals
         ) const;
 
+        void initFieldTransfer
+        (
+            const lduAddressing& lduAddr,
+            const label patchId,
+            const Field<Type>& psiInternal
+        ) const;
+
         //- Receive and send requests have both completed
         virtual bool all_ready() const;
 
@@ -119,6 +129,13 @@ public:
         explicit lduCalculatedProcessorField
         (
             const lduInterface& interface
+        );
+
+        //- Construct from ldu interface, taking the transform from field
+        lduCalculatedProcessorField
+        (
+            const lduInterface& interface,
+            const processorLduInterfaceField& field
         );
 
         //- Copy construct
@@ -165,35 +182,49 @@ public:
             const Pstream::commsTypes commsType
         ) const;
 
-        //- Initialise neighbour matrix update
         virtual void initInterfaceMatrixUpdate
         (
-            Field<scalar>& result,
-            const bool add,
+            Field<Type>&,
+            const bool,
             const lduAddressing& lduAddr,
             const label patchId,
-            const Field<scalar>& psiInternal,
-            const scalarField& coeffs,
-            const Pstream::commsTypes commsType
-        ) const
-        {
-            NotImplemented;
-        }
+            const Field<Type>& psiInternal,
+            const scalarField&,
+            const Pstream::commsTypes
+        ) const;
 
-        //- Update result field based on interface functionality
+        virtual void initInterfaceMatrixUpdate
+        (
+            Field<Type>&,
+            const bool,
+            const lduAddressing& lduAddr,
+            const label patchId,
+            const Field<Type>& psiInternal,
+            const Field<tensor4>&,
+            const Pstream::commsTypes
+        ) const;
+
         virtual void updateInterfaceMatrix
         (
-            Field<scalar>& result,
+            Field<Type>& result,
             const bool add,
-            const lduAddressing& lduAddr,
-            const label patchId,
-            const Field<scalar>& psiInternal,
+            const lduAddressing&,
+            const label,
+            const Field<Type>&,
             const scalarField& coeffs,
-            const Pstream::commsTypes commsType
-        ) const
-        {
-            NotImplemented;
-        }
+            const Pstream::commsTypes
+        ) const;
+
+        virtual void updateInterfaceMatrix
+        (
+            Field<Type>& result,
+            const bool add,
+            const lduAddressing&,
+            const label,
+            const Field<Type>&,
+            const Field<tensor4>& coeffs,
+            const Pstream::commsTypes
+        ) const;
 
 
     // Processor coupled interface functions
@@ -213,13 +244,13 @@ public:
         //- Return neighbour processor number
         virtual int neighbProcNo() const
         {
-            return procInterface_.myProcNo();
+            return procInterface_.neighbProcNo();
         }
 
         //- Is the transform required
         virtual bool doTransform() const
         {
-            return false;
+            return doTransform_;
         }
 
         //- Return face transformation tensor

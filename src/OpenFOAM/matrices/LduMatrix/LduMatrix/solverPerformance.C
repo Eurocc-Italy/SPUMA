@@ -27,6 +27,7 @@ License
 
 #include "solverPerformance.H"
 #include "fieldTypes.H"
+#include "vector4.H"
 
 namespace Foam
 {
@@ -35,6 +36,7 @@ namespace Foam
     makeSolverPerformance(sphericalTensor);
     makeSolverPerformance(symmTensor);
     makeSolverPerformance(tensor);
+    makeSolverPerformance(vector4);
 };
 
 

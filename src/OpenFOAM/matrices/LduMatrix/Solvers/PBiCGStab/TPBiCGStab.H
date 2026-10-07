@@ -1,0 +1,114 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | www.openfoam.com
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+    Copyright (C) 2016-2017 OpenFOAM Foundation
+    Copyright (C) 2019-2021 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
+-------------------------------------------------------------------------------
+License
+    This file is part of OpenFOAM.
+
+    OpenFOAM is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::TPBiCGStab
+
+Description
+    Preconditioned bi-conjugate gradient stabilized solver for asymmetric
+    LduMatrices using a run-time selectable preconditioner.
+
+    The Krylov coefficients are global scalars, so coupled block systems
+    are solved as a single system rather than component by component.
+
+SourceFiles
+    TPBiCGStab.C
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef TPBiCGStab_H
+#define TPBiCGStab_H
+
+#include "LduMatrix.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+                         Class TPBiCGStab Declaration
+\*---------------------------------------------------------------------------*/
+
+template<class Type, class DType, class LUType>
+class TPBiCGStab
+:
+    public LduMatrix<Type, DType, LUType>::solver
+{
+    // Private Member Functions
+
+        //- No copy construct
+        TPBiCGStab(const TPBiCGStab&) = delete;
+
+        //- No copy assignment
+        void operator=(const TPBiCGStab&) = delete;
+
+
+public:
+
+    //- Runtime type information
+    TypeName("PBiCGStab");
+
+
+    // Constructors
+
+        //- Construct from matrix components and solver data dictionary
+        TPBiCGStab
+        (
+            const word& fieldName,
+            const LduMatrix<Type, DType, LUType>& matrix,
+            const dictionary& solverDict
+        );
+
+
+    // Destructor
+
+        virtual ~TPBiCGStab() = default;
+
+
+    // Member Functions
+
+        //- Solve the matrix with this solver
+        virtual SolverPerformance<Type> solve(Field<Type>& psi) const;
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+    #include "TPBiCGStab.C"
+#endif
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

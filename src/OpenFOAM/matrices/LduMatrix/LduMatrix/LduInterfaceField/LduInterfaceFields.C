@@ -27,6 +27,7 @@ License
 
 #include "LduInterfaceField.H"
 #include "fieldTypes.H"
+#include "vector4.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -41,6 +42,7 @@ namespace Foam
     );
     defineTemplateTypeNameAndDebug(LduInterfaceField<symmTensor>, 0);
     defineTemplateTypeNameAndDebug(LduInterfaceField<tensor>, 0);
+    defineTemplateTypeNameAndDebug(LduInterfaceField<vector4>, 0);
 }
 
 // ************************************************************************* //

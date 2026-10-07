@@ -29,6 +29,8 @@ License
 #include "DiagonalPreconditioner.H"
 #include "TDILUPreconditioner.H"
 #include "fieldTypes.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 #define makeLduPreconditioners(Type, DType, LUType)                            \
                                                                                \
@@ -50,6 +52,10 @@ namespace Foam
     makeLduPreconditioners(sphericalTensor, scalar, scalar);
     makeLduPreconditioners(symmTensor, scalar, scalar);
     makeLduPreconditioners(tensor, scalar, scalar);
+
+    makeLduPreconditioner(NoPreconditioner, vector4, tensor4, tensor4);
+    makeLduSymPreconditioner(NoPreconditioner, vector4, tensor4, tensor4);
+    makeLduAsymPreconditioner(NoPreconditioner, vector4, tensor4, tensor4);
 };
 
 
