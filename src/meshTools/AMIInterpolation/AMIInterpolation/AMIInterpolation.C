@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2015-2025 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -429,7 +430,7 @@ void Foam::AMIInterpolation::normaliseWeights
         {
             wghtSumPtr[facei] = 0;
         }
-        
+
     };
     exec.parallelFor(Lambda,wght.size());
 
@@ -1088,7 +1089,7 @@ void Foam::AMIInterpolation::agglomerate
         // max coarse element size
         labelList upperSizes(sourceCoarseSize, 0, poolSwitch(1));
         auto upperSizesPtr = upperSizes.begin();
-        // evaluate the maximum amount of fine faces that will map 
+        // evaluate the maximum amount of fine faces that will map
         // to each coarse faces in the MG projection
         auto LambdaSize = [=](label facei)
         {

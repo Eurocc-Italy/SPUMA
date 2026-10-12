@@ -135,7 +135,7 @@ Foam::cyclicAMIGAMGInterface::cyclicAMIGAMGInterface
         // do it so it the exact loop above using neighbourRestrictAddressing
         // instead of localRestrictAddressing)
 
-        labelList nbrFaceRestrictAddressing;
+        labelList nbrFaceRestrictAddressing(poolSwitch(1));
         {
             // From face to coarse face
             DynamicList<label> dynNbrFaceRestrictAddressing

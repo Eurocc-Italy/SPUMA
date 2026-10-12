@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2019-2025 OpenCFD Ltd.
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -86,7 +86,7 @@ void Foam::GAMGAgglomeration::agglomerateLduAddressing
     labelList& faceRestrictAddr = faceRestrictAddressing_[fineLevelIndex];
 
     // Initial neighbour array (not in upper-triangle order)
-    labelList initCoarseNeighb(nFineFaces);
+    labelList initCoarseNeighb(nFineFaces,poolSwitch(1));
 
     // Counter for coarse faces
     label& nCoarseFaces = nFaces_[fineLevelIndex];
@@ -204,7 +204,7 @@ void Foam::GAMGAgglomeration::agglomerateLduAddressing
 
 
     // Create face-flip status
-    faceFlipMap_.set(fineLevelIndex, new boolList(nFineFaces, false));
+    faceFlipMap_.set(fineLevelIndex, new boolList(nFineFaces, false, poolSwitch(1)));
     boolList& faceFlipMap = faceFlipMap_[fineLevelIndex];
 
 

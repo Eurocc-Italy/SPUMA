@@ -291,6 +291,8 @@ $(AMI)/GAMG/interfaces/cyclicAMIGAMGInterface/cyclicAMIGAMGInterface.C
 $(AMI)/GAMG/interfaceFields/cyclicAMIGAMGInterfaceField/cyclicAMIGAMGInterfaceField.C
 $(AMI)/GAMG/interfaces/cyclicACMIGAMGInterface/cyclicACMIGAMGInterface.C
 $(AMI)/GAMG/interfaceFields/cyclicACMIGAMGInterfaceField/cyclicACMIGAMGInterfaceField.C
+$(AMI)/GAMG/interfaces/overlapAMIGAMGInterface/overlapAMIGAMGInterface.C
+$(AMI)/GAMG/interfaceFields/overlapAMIGAMGInterfaceField/overlapAMIGAMGInterfaceField.C
 
 $(AMI)/triangle2D/triangle2D.C
 $(AMI)/AMIInterpolation/faceAreaWeightAMI2D/faceAreaWeightAMI2D.C
@@ -310,6 +312,13 @@ $(ACMICycPatches)/cyclicACMILduInterfaceField/cyclicACMILduInterfaceField.C
 $(ACMICycPatches)/cyclicACMIPolyPatch/cyclicACMIPolyPatch.C
 $(ACMICycPatches)/cyclicACMIPointPatch/cyclicACMIPointPatch.C
 $(ACMICycPatches)/cyclicACMIPointPatchField/cyclicACMIPointPatchFields.C
+
+AMIOverlapPatches=$(AMI)/patches/overlapAMI
+$(AMIOverlapPatches)/overlapAMILduInterfaceField/overlapAMILduInterface.C
+$(AMIOverlapPatches)/overlapAMILduInterfaceField/overlapAMILduInterfaceField.C
+$(AMIOverlapPatches)/overlapAMIPolyPatch/overlapAMIPolyPatch.C
+$(AMIOverlapPatches)/overlapAMIPointPatch/overlapAMIPointPatch.C
+$(AMIOverlapPatches)/overlapAMIPointPatchField/overlapAMIPointPatchFields.C
 
 PeriodicAMICycPatches=$(AMI)/patches/cyclicPeriodicAMI
 $(PeriodicAMICycPatches)/cyclicPeriodicAMIPolyPatch/cyclicPeriodicAMIPolyPatch.C
