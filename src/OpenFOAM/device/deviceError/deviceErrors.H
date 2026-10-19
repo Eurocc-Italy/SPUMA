@@ -42,4 +42,7 @@ SourceFiles
         printf("\nError in kernel function: \n" msg "\n", ##__VA_ARGS__);  \
         assert(0);
 
+#define warningInKernelFunction(msg, ...)                                    \
+        printf("\nWarning in kernel function: \n" msg "\n", ##__VA_ARGS__);  \
+
 #endif

@@ -110,7 +110,6 @@ void Foam::AMIInterpolation::weightedSumListListAddr
     const auto slotsPtrsPtr = allSlotsAddr.begins().cbegin();
     const auto weightsPtrsPtr = allWeightsAddr.begins().cbegin();
 
-
     if (lowWeightCorrection > 0)
     {
         auto Lambda = [=](label facei)
@@ -121,8 +120,8 @@ void Foam::AMIInterpolation::weightedSumListListAddr
             }
             else
             {
-                const auto slots = slotsPtrsPtr[facei];
-                const auto weights = weightsPtrsPtr[facei];
+                const label* slots = slotsPtrsPtr[facei];
+                const scalar* weights = weightsPtrsPtr[facei];
 
                 for (label i = 0; i < slotsSizePtr[facei]; i++)
                 {
@@ -138,8 +137,8 @@ void Foam::AMIInterpolation::weightedSumListListAddr
     {
         auto Lambda = [=](label facei)
         {
-            const auto slots = slotsPtrsPtr[facei];
-            const auto weights = weightsPtrsPtr[facei];
+            const label* slots = slotsPtrsPtr[facei];
+            const scalar* weights = weightsPtrsPtr[facei];
 
             for (label i = 0; i < slotsSizePtr[facei]; i++)
             {

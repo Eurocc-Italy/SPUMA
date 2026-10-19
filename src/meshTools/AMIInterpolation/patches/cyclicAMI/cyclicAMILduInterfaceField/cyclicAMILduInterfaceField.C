@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2013 OpenFOAM Foundation
     Copyright (C) 2019 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -53,13 +54,25 @@ void Foam::cyclicAMILduInterfaceField::transformCoupleField
 {
     if (doTransform())
     {
+        foamExecutor exec;
+        auto fPtr = f.begin();
+        const auto forwardTPtr = forwardT().cbegin();
+        const auto localRank = rank();
         if (forwardT().size() == 1)
         {
-            f *= pow(diag(forwardT()[0]).component(cmpt), rank());
+            auto Lambda = [=](label i)
+            {
+                fPtr[i] *= pow(diag(forwardTPtr[0]).component(cmpt), localRank);
+            };
+            exec.parallelFor(Lambda, f.size());
         }
         else
         {
-            f *= pow(diag(forwardT())().component(cmpt), rank());
+            auto Lambda = [=](label i)
+            {
+                fPtr[i] *= pow(diag(forwardTPtr[i]).component(cmpt), localRank);
+            };
+            exec.parallelFor(Lambda, f.size());
         }
     }
 }

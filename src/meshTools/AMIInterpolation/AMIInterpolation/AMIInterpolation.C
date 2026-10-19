@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2015-2025 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -35,6 +36,8 @@ License
 #include "OFstream.H"
 #include "registerSwitch.H"
 #include "ListOps.H"
+#include "ListListOps.H"
+#include "OFstream.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -427,7 +430,7 @@ void Foam::AMIInterpolation::normaliseWeights
         {
             wghtSumPtr[facei] = 0;
         }
-        
+
     };
     exec.parallelFor(Lambda,wght.size());
 
@@ -835,15 +838,22 @@ void Foam::AMIInterpolation::agglomerate
         //srcMagSf.setSize(sourceRestrictAddressing.size(), 0.0);
         srcMagSf.setSize(sourceCoarseSize, 0.0);
 
-        forAll(sourceRestrictAddressing, facei)
+        foamExecutor exec;
+        auto srcMagSfPtr = srcMagSf.begin();
+        const auto sourceRestrictAddressingPtr = sourceRestrictAddressing.cbegin();
+        const auto fineSrcMagSfPtr = fineSrcMagSf.cbegin();
+        auto Lambda = [=](label facei)
         {
-            label coarseFacei = sourceRestrictAddressing[facei];
-            srcMagSf[coarseFacei] += fineSrcMagSf[facei];
-        }
+            label coarseFacei = sourceRestrictAddressingPtr[facei];
+            foamAtomic::AtomicAdd(srcMagSfPtr[coarseFacei], fineSrcMagSfPtr[facei]);
+        };
+        exec.parallelFor(Lambda,sourceRestrictAddressing.size());
     }
 
+    // ensure new lists are on memory pool
     labelListList srcAddress(sourceCoarseSize,labelList(poolSwitch(1)),poolSwitch(1));
     scalarListList srcWeights(sourceCoarseSize,scalarList(poolSwitch(1)),poolSwitch(1));
+
     // Agglomerate weights and indices
     if (targetMapPtr)
     {
@@ -1070,40 +1080,126 @@ void Foam::AMIInterpolation::agglomerate
     }
     else
     {
+        // Non distribute AMI branch
+        foamExecutor exec;
 
-        //Info << "agglomerate 2 new singleproc" << endl;
+        const auto fineSrcAddrSizesPtr = fineSrcAddressAddr.sizes().cbegin();
+        const auto sourceRestrictAddressingPtr = sourceRestrictAddressing.cbegin();
 
-        // TODO
-        forAll(fineSrcAddress, facei)
+        // max coarse element size
+        labelList upperSizes(sourceCoarseSize, 0, poolSwitch(1));
+        auto upperSizesPtr = upperSizes.begin();
+        // evaluate the maximum amount of fine faces that will map
+        // to each coarse faces in the MG projection
+        auto LambdaSize = [=](label facei)
         {
-            // All the elements contributing to facei. Are slots in
-            // mapDistribute'd data.
-            const labelList& elems = fineSrcAddress[facei];
-            const scalarList& weights = fineSrcWeights[facei];
-            const scalar fineArea = fineSrcMagSf[facei];
+            const label coarseFacei = sourceRestrictAddressingPtr[facei];
+            foamAtomic::AtomicAdd(upperSizesPtr[coarseFacei], fineSrcAddrSizesPtr[facei]);
+        };
+        exec.parallelFor(LambdaSize, fineSrcAddressAddr.sizes().size());
 
-            label coarseFacei = sourceRestrictAddressing[facei];
+        // allocate plain lists to use as scratch space for the new addressing and weights
+        const label sumUpperSizes = sum(upperSizes);
+        labelList scratchAddr(sumUpperSizes, -1, poolSwitch(1));
+        scalarList scratchWeights(sumUpperSizes, 0.0, poolSwitch(1));
+        // evaluate indirect addressing for the new coarse faces
+        srcAddressNewAddr.reset(new ListListAddr<labelList>(scratchAddr,upperSizes));
+        srcWeightsNewAddr.reset(new ListListAddr<scalarList>(scratchWeights,upperSizes));
 
-            labelList& newElems = srcAddress[coarseFacei];
-            scalarList& newWeights = srcWeights[coarseFacei];
+        // list to keep track of the number of real number of unique faces in the coarse mesh
+        labelList slotCount(sourceCoarseSize, 0, poolSwitch(1));
 
-            forAll(elems, i)
+        // fill kernel coarse addressing and weights
+
+        const auto fineSrcAddrBeginsPtr = fineSrcAddressAddr.begins().cbegin();
+        const auto fineSrcWeightsBeginsPtr = fineSrcWeightsAddr.begins().cbegin();
+        const auto fineSrcMagSfPtr = fineSrcMagSf.cbegin();
+        const auto targetRestrictAddressingPtr = targetRestrictAddressing.cbegin();
+
+        label** srcAddrBeginsPtr = const_cast<label**>(srcAddressNewAddr.ref().begins().begin());
+        scalar** srcWeightsBeginsPtr = const_cast<scalar**>(srcWeightsNewAddr.ref().begins().begin());
+        auto slotCountPtr = slotCount.begin();
+        const auto upperSizesCPtr = upperSizes.cbegin();
+
+        auto LambdaFill = [=](label facei)
+        {
+            const label   coarseFacei = sourceRestrictAddressingPtr[facei];
+            const label*  elems       = fineSrcAddrBeginsPtr[facei];
+            const scalar* weights     = fineSrcWeightsBeginsPtr[facei];
+            const scalar  fineArea    = fineSrcMagSfPtr[facei];
+            const label   n           = fineSrcAddrSizesPtr[facei];
+
+            label*  newElems   = srcAddrBeginsPtr[coarseFacei];
+            scalar* newWeights = srcWeightsBeginsPtr[coarseFacei];
+            const label cap    = upperSizesCPtr[coarseFacei];
+
+            for (label i = 0; i < n; ++i)
             {
-                const label elemi = elems[i];
-                const label coarseElemi = targetRestrictAddressing[elemi];
+                const label  key     = targetRestrictAddressingPtr[elems[i]];
+                const scalar contrib = fineArea*weights[i];
 
-                const label index = newElems.find(coarseElemi);
-                if (index == -1)
+                // lock-free open-addressing insert (linear probe from 0)
+                label slot = -1;
+                for (label s = 0; s < cap; ++s)
                 {
-                    newElems.append(coarseElemi);
-                    newWeights.append(fineArea*weights[i]);
+                    const label cur = newElems[s];        // monotonic: -1 -> key, never changes back
+                    if (cur == key) { slot = s; break; }  // key already present
+                    if (cur == -1)
+                    {
+                        const label old = foamAtomic::AtomicCAS(newElems[s], -1, key);
+                        if (old == -1)                     // we claimed a fresh slot
+                        {
+                            foamAtomic::AtomicAdd(slotCountPtr[coarseFacei], 1);
+                            slot = s; break;
+                        }
+                        if (old == key) { slot = s; break; } // another thread inserted same key here
+                        // else: slot taken by a different key -> keep probing
+                    }
                 }
-                else
-                {
-                    newWeights[index] += fineArea*weights[i];
-                }
+
+                foamAtomic::AtomicAdd(newWeights[slot], contrib);
             }
-        }
+        };
+        exec.parallelFor(LambdaFill, fineSrcAddressAddr.sizes().size());
+
+        // resize lists to actual number of unique coarse elements
+        const label actualSize = sum(slotCount);
+        labelList scratchAddr2(actualSize,poolSwitch(1));
+        scalarList scratchWeights2(actualSize,poolSwitch(1));
+        auto scratchAddr2Ptr = scratchAddr2.begin();
+        auto scratchWeights2Ptr = scratchWeights2.begin();
+        const auto scratchAddrPtr = scratchAddr.begin();
+        const auto scratchWeightsPtr = scratchWeights.begin();
+
+        labelList prefixUpperSizes(sourceCoarseSize,poolSwitch(1));
+        labelList prefixSlotCount(sourceCoarseSize,poolSwitch(1));
+        auto prefixUpperSizestPtr = prefixUpperSizes.begin();
+        auto prefixSlotCountPtr = prefixSlotCount.begin();
+        exec.exclusivePrefixSum(prefixUpperSizestPtr, upperSizesPtr, sourceCoarseSize);
+        exec.exclusivePrefixSum(prefixSlotCountPtr, slotCountPtr, sourceCoarseSize);
+        // TODO: this probably can be optimized further by leveraging the fact
+        // that the corse face array will be contiguous in memory except for the last few entries that
+        // remain initialized as -1 for the unused slots
+        auto LambdaCopy = [=](label i)
+            {
+                const label offset = prefixUpperSizestPtr[i];
+                const label offset2 = prefixSlotCountPtr[i];
+                for (size_t j = 0; j < slotCountPtr[i]; j++)
+                {
+                    scratchAddr2Ptr[offset2 + j] = scratchAddrPtr[offset + j];
+                    scratchWeights2Ptr[offset2 + j] = scratchWeightsPtr[offset + j];
+                }
+        };
+        exec.parallelFor(LambdaCopy, sourceCoarseSize);
+        // release larger scratch lists
+        scratchAddr.clear();
+        scratchWeights.clear();
+        // convert to ListList
+        auto addrll = ListToListList(scratchAddr2,slotCount);
+        auto weightsll = ListToListList(scratchWeights2,slotCount);
+        srcAddress = addrll.ref();
+        srcWeights = weightsll.ref();
+
     }
 
 

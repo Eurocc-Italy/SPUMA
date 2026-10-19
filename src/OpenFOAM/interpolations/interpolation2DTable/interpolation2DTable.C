@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2016-2020 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -56,7 +57,7 @@ void Foam::interpolation2DTable<Type>::readTable()
 template<class Type>
 Foam::interpolation2DTable<Type>::interpolation2DTable()
 :
-    List<value_type>(),
+    List<value_type>(poolSwitch(1)),
     bounding_(bounds::normalBounding::WARN),
     fileName_("fileNameIsUndefined"),
     reader_(nullptr)
@@ -79,21 +80,46 @@ Foam::interpolation2DTable<Type>::interpolation2DTable
 
 
 template<class Type>
-Foam::interpolation2DTable<Type>::interpolation2DTable(const fileName& fName)
+Foam::interpolation2DTable<Type>::interpolation2DTable
+(
+    const fileName& fName,
+    const bounds::normalBounding bounding
+)
 :
-    List<value_type>(),
-    bounding_(bounds::normalBounding::WARN),
+    List<value_type>(poolSwitch(1)),
+    bounding_(bounding),
     fileName_(fName),
     reader_(new openFoamTableReader<Type>())
 {
     readTable();
+
+    const List<value_type>& values = *this;
+
+    List<value_type> tmpTable
+    (
+        values.size(),
+        value_type
+        (
+            0,
+            List<Tuple2<scalar, Type>>(poolSwitch(1))
+        ),
+        poolSwitch(1)
+    );
+
+    for (label i=0; i<values.size(); ++i)
+    {
+        tmpTable[i].first() = values[i].first();
+        tmpTable[i].second() = values[i].second();
+    }
+
+    this->swap(tmpTable);
 }
 
 
 template<class Type>
 Foam::interpolation2DTable<Type>::interpolation2DTable(const dictionary& dict)
 :
-    List<value_type>(),
+    List<value_type>(poolSwitch(1)),
     bounding_
     (
         bounds::normalBoundingNames.getOrDefault
@@ -165,15 +191,18 @@ Foam::label Foam::interpolation2DTable<Type>::Xi
         {
             case bounds::normalBounding::ERROR:
             {
-                FatalErrorInFunction
-                    << "value (" << valueX << ") out of bounds" << nl
-                    << exit(FatalError);
+                fatalErrorInKernelFunction
+                (
+                    "value (%f) out of bounds\n", valueX
+                )
                 break;
             }
             case bounds::normalBounding::WARN:
             {
-                WarningInFunction
-                    << "value (" << valueX << ") out of bounds" << nl;
+                warningInKernelFunction
+                (
+                    "value (%f) out of bounds\n", valueX
+                )
 
                 // Behaviour as per CLAMP
                 return limitI;
@@ -186,9 +215,10 @@ Foam::label Foam::interpolation2DTable<Type>::Xi
             }
             default:
             {
-                FatalErrorInFunction
-                    << "Unhandled bounding type " << int(bounding_)
-                    << abort(FatalError);
+                fatalErrorInKernelFunction
+                (
+                    "Unhandled bounding type %d\n", int(bounding_)
+                )
             }
         }
     }
@@ -250,8 +280,10 @@ Type Foam::interpolation2DTable<Type>::operator()
 
     if (nX == 0)
     {
-        WarningInFunction
-            << "Cannot interpolate zero-sized table - returning zero" << nl;
+        warningInKernelFunction
+        (
+            "Cannot interpolate zero-sized table - returning zero\n"
+        )
 
         return Zero;
     }
@@ -261,7 +293,6 @@ Type Foam::interpolation2DTable<Type>::operator()
         return interpolateValue(t.first().second(), valueY);
     }
 
-
     // Find low and high indices in the X range that bound valueX
     const label lo = Xi(lessOp<scalar>(), valueX, false);
     const label hi = Xi(greaterOp<scalar>(), valueX, true);
@@ -270,7 +301,6 @@ Type Foam::interpolation2DTable<Type>::operator()
     {
         return interpolateValue(t[lo].second(), valueY);
     }
-
 
     // Normal interpolation
 

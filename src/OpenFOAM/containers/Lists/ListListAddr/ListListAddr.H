@@ -58,6 +58,7 @@ class ListListAddr
 private:
     
     using iterator_type = const typename T::value_type*;
+    using iterator_type_no_cv = typename T::value_type*;
 
     bool usepool_;
 
@@ -77,7 +78,10 @@ public:
             usepool_(false)
         {};
         
-        ListListAddr(const UList<T>& listlist);
+        explicit ListListAddr(const UList<T>& listlist);
+
+        template<typename pType>
+        ListListAddr(const UList<pType>& list, const labelUList& sizes);
         
         ListListAddr(const ListListAddr& other);
 

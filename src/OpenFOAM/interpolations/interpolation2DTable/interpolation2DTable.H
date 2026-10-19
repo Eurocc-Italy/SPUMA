@@ -114,7 +114,11 @@ public:
         );
 
         //- Construct given the name of the file containing the table of data
-        explicit interpolation2DTable(const fileName& fName);
+        explicit interpolation2DTable
+        (
+            const fileName& fName,
+            const bounds::normalBounding = bounds::normalBounding::WARN
+        );
 
         //- Construct by reading file name and outOfBounds from dictionary
         explicit interpolation2DTable(const dictionary& dict);

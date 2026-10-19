@@ -111,25 +111,33 @@ Foam::tmp<Foam::surfaceScalarField> Foam::basicFvGeometryScheme::weights() const
     // ... and reference to the internal field of the weighting factors
     scalarField& w = weights.primitiveFieldRef();
 
-    forAll(owner, facei)
+    foamExecutor exec;
+    const auto SfPtr = Sf.cbegin();
+    const auto CfPtr = Cf.cbegin();
+    const auto CPtr = C.cbegin();
+    const auto ownerPtr = owner.cbegin();
+    const auto neighbourPtr = neighbour.cbegin();
+    auto wPtr = w.begin();
+    auto Lambda = [=](label facei)
     {
         // Note: mag in the dot-product.
         // For all valid meshes, the non-orthogonality will be less than
         // 90 deg and the dot-product will be positive.  For invalid
         // meshes (d & s <= 0), this will stabilise the calculation
         // but the result will be poor.
-        scalar SfdOwn = mag(Sf[facei] & (Cf[facei] - C[owner[facei]]));
-        scalar SfdNei = mag(Sf[facei] & (C[neighbour[facei]] - Cf[facei]));
+        scalar SfdOwn = mag(SfPtr[facei] & (CfPtr[facei] - CPtr[ownerPtr[facei]]));
+        scalar SfdNei = mag(SfPtr[facei] & (CPtr[neighbourPtr[facei]] - CfPtr[facei]));
 
         if (mag(SfdOwn + SfdNei) > ROOTVSMALL)
         {
-            w[facei] = SfdNei/(SfdOwn + SfdNei);
+            wPtr[facei] = SfdNei/(SfdOwn + SfdNei);
         }
         else
         {
-            w[facei] = 0.5;
+            wPtr[facei] = 0.5;
         }
-    }
+    };
+    exec.parallelFor(Lambda, owner.size());
 
     auto& wBf = weights.boundaryFieldRef();
 
@@ -186,11 +194,17 @@ Foam::basicFvGeometryScheme::deltaCoeffs() const
     const vectorField& C = mesh_.cellCentres();
     const labelUList& owner = mesh_.owner();
     const labelUList& neighbour = mesh_.neighbour();
-
-    forAll(owner, facei)
+    
+    foamExecutor exec;
+    const auto CPtr = C.cbegin();
+    const auto ownerPtr = owner.cbegin();
+    const auto neighbourPtr = neighbour.cbegin();
+    auto deltaCoeffsPtr = deltaCoeffs.primitiveFieldRef().begin();
+    auto Lambda = [=](label facei)
     {
-        deltaCoeffs[facei] = 1.0/mag(C[neighbour[facei]] - C[owner[facei]]);
-    }
+        deltaCoeffsPtr[facei] = 1.0/mag(CPtr[neighbourPtr[facei]] - CPtr[ownerPtr[facei]]);
+    };
+    exec.parallelFor(Lambda, owner.size());
 
     auto& deltaCoeffsBf = deltaCoeffs.boundaryFieldRef();
 
@@ -248,23 +262,22 @@ Foam::basicFvGeometryScheme::nonOrthDeltaCoeffs() const
     const surfaceVectorField& Sf = mesh_.Sf();
     const surfaceScalarField& magSf = mesh_.magSf();
 
-    forAll(owner, facei)
+    foamExecutor exec;
+    const auto CPtr = C.cbegin();
+    const auto ownerPtr = owner.cbegin();
+    const auto neighbourPtr = neighbour.cbegin();
+    const auto SfPtr = Sf.cbegin();
+    const auto magSfPtr = magSf.cbegin();
+    auto nonOrthDeltaCoeffsPtr = nonOrthDeltaCoeffs.primitiveFieldRef().begin();
+    auto Lambda = [=](label facei)
     {
-        vector delta = C[neighbour[facei]] - C[owner[facei]];
-        vector unitArea = Sf[facei]/magSf[facei];
-
-        // Standard cell-centre distance form
-        //NonOrthDeltaCoeffs[facei] = (unitArea & delta)/magSqr(delta);
-
-        // Slightly under-relaxed form
-        //NonOrthDeltaCoeffs[facei] = 1.0/mag(delta);
-
-        // More under-relaxed form
-        //NonOrthDeltaCoeffs[facei] = 1.0/(mag(unitArea & delta) + VSMALL);
+        vector delta = CPtr[neighbourPtr[facei]] - CPtr[ownerPtr[facei]];
+        vector unitArea = SfPtr[facei]/magSfPtr[facei];
 
         // Stabilised form for bad meshes
-        nonOrthDeltaCoeffs[facei] = 1.0/max(unitArea & delta, 0.05*mag(delta));
-    }
+        nonOrthDeltaCoeffsPtr[facei] = 1.0/max(unitArea & delta, 0.05*mag(delta));
+    };
+    exec.parallelFor(Lambda, owner.size());
 
     auto& nonOrthDeltaCoeffsBf = nonOrthDeltaCoeffs.boundaryFieldRef();
 
@@ -276,17 +289,20 @@ Foam::basicFvGeometryScheme::nonOrthDeltaCoeffs() const
 
         const vectorField patchDeltas(mesh_.boundary()[patchi].delta());
 
-        forAll(p, patchFacei)
+        const auto SfBfPtr = Sf.boundaryField()[patchi].cbegin();
+        const auto magSfBfPtr = magSf.boundaryField()[patchi].cbegin();
+        const auto patchDeltasPtr = patchDeltas.cbegin();
+        auto patchDeltasCoeffsPtr = patchDeltaCoeffs.begin();
+        auto Lambda = [=](label patchFacei)
         {
-            vector unitArea =
-                Sf.boundaryField()[patchi][patchFacei]
-               /magSf.boundaryField()[patchi][patchFacei];
+            vector unitArea = SfBfPtr[patchFacei]/magSfBfPtr[patchFacei];
+            const vector& delta = patchDeltasPtr[patchFacei];
 
-            const vector& delta = patchDeltas[patchFacei];
-
-            patchDeltaCoeffs[patchFacei] =
+            patchDeltasCoeffsPtr[patchFacei] =
                 1.0/max(unitArea & delta, 0.05*mag(delta));
-        }
+        };
+        exec.parallelFor(Lambda, p.size());
+
 
         // Optionally correct
         p.makeNonOrthoDeltaCoeffs(patchDeltaCoeffs);
@@ -333,13 +349,22 @@ Foam::basicFvGeometryScheme::nonOrthCorrectionVectors() const
     tmp<surfaceScalarField> tNonOrthDeltaCoeffs(nonOrthDeltaCoeffs());
     const surfaceScalarField& NonOrthDeltaCoeffs = tNonOrthDeltaCoeffs();
 
-    forAll(owner, facei)
+    foamExecutor exec;
+    const auto CPtr = C.cbegin();
+    const auto ownerPtr = owner.cbegin();
+    const auto neighbourPtr = neighbour.cbegin();
+    const auto SfPtr = Sf.cbegin();
+    const auto magSfPtr = magSf.cbegin();
+    const auto NonOrthDeltaCoeffsPtr = NonOrthDeltaCoeffs.cbegin();
+    auto corrVecsPtr = corrVecs.primitiveFieldRef().begin();
+    auto Lambda = [=](label facei)
     {
-        vector unitArea(Sf[facei]/magSf[facei]);
-        vector delta(C[neighbour[facei]] - C[owner[facei]]);
-
-        corrVecs[facei] = unitArea - delta*NonOrthDeltaCoeffs[facei];
-    }
+        vector unitArea(SfPtr[facei]/magSfPtr[facei]);
+        vector delta(CPtr[neighbourPtr[facei]] - CPtr[ownerPtr[facei]]);
+        
+        corrVecsPtr[facei] = unitArea - delta*NonOrthDeltaCoeffsPtr[facei];
+    };
+    exec.parallelFor(Lambda, owner.size());
 
     // Boundary correction vectors set to zero for boundary patches
     // and calculated consistently with internal corrections for
@@ -364,17 +389,20 @@ Foam::basicFvGeometryScheme::nonOrthCorrectionVectors() const
 
             const vectorField patchDeltas(mesh_.boundary()[patchi].delta());
 
-            forAll(p, patchFacei)
+            const auto SfBfPtr = Sf.boundaryField()[patchi].cbegin();
+            const auto magSfBfPtr = magSf.boundaryField()[patchi].cbegin();
+            const auto patchDeltasPtr = patchDeltas.cbegin();
+            const auto patchNonOrthDeltaCoeffsPtr = patchNonOrthDeltaCoeffs.cbegin();
+            auto patchCorrVecsPtr = patchCorrVecs.begin();
+            auto Lambda = [=](label patchFacei)
             {
-                vector unitArea =
-                    Sf.boundaryField()[patchi][patchFacei]
-                   /magSf.boundaryField()[patchi][patchFacei];
+                vector unitArea = SfBfPtr[patchFacei]/magSfBfPtr[patchFacei];
+                const vector& delta = patchDeltasPtr[patchFacei];
 
-                const vector& delta = patchDeltas[patchFacei];
-
-                patchCorrVecs[patchFacei] =
-                    unitArea - delta*patchNonOrthDeltaCoeffs[patchFacei];
-            }
+                patchCorrVecsPtr[patchFacei] =
+                    unitArea - delta*patchNonOrthDeltaCoeffsPtr[patchFacei];
+            };
+            exec.parallelFor(Lambda, p.size());
         }
 
         // Optionally correct

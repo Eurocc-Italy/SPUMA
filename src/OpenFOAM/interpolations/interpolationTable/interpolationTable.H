@@ -126,7 +126,11 @@ public:
         );
 
         //- Construct given the name of the file containing the table of data
-        explicit interpolationTable(const fileName& fName);
+        explicit interpolationTable
+        (
+            const fileName& fName,
+            const bounds::repeatableBounding = bounds::repeatableBounding::WARN
+        );
 
         //- Construct by reading file name and outOfBounds from dictionary
         //- and read the table from that file.

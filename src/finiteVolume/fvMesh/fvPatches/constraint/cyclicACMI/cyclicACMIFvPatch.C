@@ -110,24 +110,28 @@ void Foam::cyclicACMIFvPatch::makeWeights(scalarField& w) const
 
         const scalar tol = cyclicACMIPolyPatch::tolerance();
 
-
-        forAll(deltas, facei)
+        foamExecutor exec;
+        const auto deltasPtr = deltas.cbegin();
+        const auto nbrDeltasPtr = nbrDeltas.cbegin();
+        auto wPtr = w.begin();
+        auto Lambda = [=](label facei)
         {
-            scalar di = mag(deltas[facei]);
-            scalar dni = mag(nbrDeltas[facei]);
+            const scalar ddi = mag(deltasPtr[facei]);
+            const scalar dni = mag(nbrDeltasPtr[facei]);
 
             if (dni < tol)
             {
                 // Avoid zero weights on disconnected faces. This value
                 // will be weighted with the (zero) face area so will not
                 // influence calculations.
-                w[facei] = 1.0;
+                wPtr[facei] = 1.0;
             }
             else
             {
-                w[facei] = dni/(di + dni);
+                wPtr[facei] = dni/(ddi + dni);
             }
-        }
+        };
+        exec.parallelFor(Lambda, w.size());
     }
     else
     {

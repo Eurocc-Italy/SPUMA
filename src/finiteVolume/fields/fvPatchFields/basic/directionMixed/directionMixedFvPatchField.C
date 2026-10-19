@@ -189,20 +189,19 @@ Foam::directionMixedFvPatchField<Type>::snGradTransformDiag() const
     {
         vectorField diag(valueFraction_.size());
 
-        std::transform
-        (
-            valueFraction_.cbegin(),
-            valueFraction_.cend(),
-            diag.begin(),
+        foamExecutor exec;
+        auto diagPtr = diag.begin();
+        const auto valueFractionPtr = valueFraction_.cbegin();
 
-            [](const symmTensor& t)
-            {
-                return vector
-                (
-                    sqrt(mag(t.xx())), sqrt(mag(t.yy())), sqrt(mag(t.zz()))
-                );
-            }
-        );
+        auto Lambda = [=](label i)
+        {
+            const auto& t = valueFractionPtr[i];
+            diagPtr[i] = vector
+            (
+                sqrt(mag(t.xx())), sqrt(mag(t.yy())), sqrt(mag(t.zz()))
+            );
+        };
+        exec.parallelFor(Lambda, diag.size());
 
         return transformFieldMask<Type>(pow<vector, pTraits<Type>::rank>(diag));
     }
