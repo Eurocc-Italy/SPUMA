@@ -61,6 +61,8 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
     Field<tensor4>& blockDiag = this->diag();
     Field<vector4>& blockSource = this->source();
 
+    foamExecutor exec;
+
     for (direction cmpt = 0; cmpt < 3; ++cmpt)
     {
         scalarField diag(internalDiag);
@@ -74,11 +76,21 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
             );
         }
 
-        forAll(blockDiag, celli)
+        const scalarField sourceCmpt(source.component(cmpt));
+
+        const direction r = row + cmpt;
+        const direction c = col + cmpt;
+        const scalar* const __restrict__ diagPtr = diag.cbegin();
+        const scalar* const __restrict__ sourcePtr = sourceCmpt.cbegin();
+        tensor4* __restrict__ blockDiagPtr = blockDiag.begin();
+        vector4* __restrict__ blockSourcePtr = blockSource.begin();
+
+        auto LambdaDiag = [=](label celli)
         {
-            blockDiag[celli](row + cmpt, col + cmpt) = diag[celli];
-            blockSource[celli][row + cmpt] += source[celli][cmpt];
-        }
+            blockDiagPtr[celli](r, c) = diagPtr[celli];
+            blockSourcePtr[celli][r] += sourcePtr[celli];
+        };
+        exec.parallelFor(LambdaDiag, blockDiag.size());
     }
 
     if (matrix.hasUpper())
@@ -86,13 +98,17 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
         const scalarField& upper = matrix.upper();
         Field<tensor4>& blockUpper = this->upper();
 
-        forAll(upper, facei)
+        const scalar* const __restrict__ upperPtr = upper.cbegin();
+        tensor4* __restrict__ blockUpperPtr = blockUpper.begin();
+
+        auto LambdaUpper = [=](label facei)
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                blockUpper[facei](row + cmpt, col + cmpt) = upper[facei];
+                blockUpperPtr[facei](row + cmpt, col + cmpt) = upperPtr[facei];
             }
-        }
+        };
+        exec.parallelFor(LambdaUpper, upper.size());
     }
 
     if (matrix.hasLower() || matrix.hasUpper())
@@ -101,13 +117,17 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
         const scalarField& lower = std::as_const(matrix).lower();
         Field<tensor4>& blockLower = this->lower();
 
-        forAll(lower, facei)
+        const scalar* const __restrict__ lowerPtr = lower.cbegin();
+        tensor4* __restrict__ blockLowerPtr = blockLower.begin();
+
+        auto LambdaLower = [=](label facei)
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                blockLower[facei](row + cmpt, col + cmpt) = lower[facei];
+                blockLowerPtr[facei](row + cmpt, col + cmpt) = lowerPtr[facei];
             }
-        }
+        };
+        exec.parallelFor(LambdaLower, lower.size());
     }
 
     const fvMesh& mesh = matrix.psi().mesh();
@@ -124,28 +144,33 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
             this->interfacesUpper().set
             (
                 patchi,
-                new Field<tensor4>(internal.size(), tensor4(Zero))
+                new Field<tensor4>(internal.size(), Zero)
             );
             this->interfacesLower().set
             (
                 patchi,
-                new Field<tensor4>(internal.size(), tensor4(Zero))
+                new Field<tensor4>(internal.size(), Zero)
             );
         }
 
-        Field<tensor4>& patchUpper = this->interfacesUpper()[patchi];
-        Field<tensor4>& patchLower = this->interfacesLower()[patchi];
+        const vector* const __restrict__ internalPtr = internal.cbegin();
+        const vector* const __restrict__ boundaryPtr = boundary.cbegin();
+        tensor4* __restrict__ patchUpperPtr =
+            this->interfacesUpper()[patchi].begin();
+        tensor4* __restrict__ patchLowerPtr =
+            this->interfacesLower()[patchi].begin();
 
-        forAll(internal, facei)
+        auto LambdaPatch = [=](label facei)
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                patchUpper[facei](row + cmpt, col + cmpt) =
-                    -boundary[facei][cmpt];
-                patchLower[facei](row + cmpt, col + cmpt) =
-                    internal[facei][cmpt];
+                patchUpperPtr[facei](row + cmpt, col + cmpt) =
+                    -boundaryPtr[facei][cmpt];
+                patchLowerPtr[facei](row + cmpt, col + cmpt) =
+                    internalPtr[facei][cmpt];
             }
-        }
+        };
+        exec.parallelFor(LambdaPatch, internal.size());
     }
 }
 
@@ -191,10 +216,20 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
     Field<tensor4>& blockDiag = this->diag();
     Field<vector4>& blockSource = this->source();
 
-    forAll(blockDiag, celli)
+    foamExecutor exec;
+
     {
-        blockDiag[celli](row, col) = diag[celli];
-        blockSource[celli][row] += source[celli];
+        const scalar* const __restrict__ diagPtr = diag.cbegin();
+        const scalar* const __restrict__ sourcePtr = source.cbegin();
+        tensor4* __restrict__ blockDiagPtr = blockDiag.begin();
+        vector4* __restrict__ blockSourcePtr = blockSource.begin();
+
+        auto LambdaDiag = [=](label celli)
+        {
+            blockDiagPtr[celli](row, col) = diagPtr[celli];
+            blockSourcePtr[celli][row] += sourcePtr[celli];
+        };
+        exec.parallelFor(LambdaDiag, blockDiag.size());
     }
 
     if (matrix.hasUpper())
@@ -202,10 +237,14 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
         const scalarField& upper = matrix.upper();
         Field<tensor4>& blockUpper = this->upper();
 
-        forAll(upper, facei)
+        const scalar* const __restrict__ upperPtr = upper.cbegin();
+        tensor4* __restrict__ blockUpperPtr = blockUpper.begin();
+
+        auto LambdaUpper = [=](label facei)
         {
-            blockUpper[facei](row, col) = upper[facei];
-        }
+            blockUpperPtr[facei](row, col) = upperPtr[facei];
+        };
+        exec.parallelFor(LambdaUpper, upper.size());
     }
 
     if (matrix.hasLower() || matrix.hasUpper())
@@ -214,10 +253,14 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
         const scalarField& lower = std::as_const(matrix).lower();
         Field<tensor4>& blockLower = this->lower();
 
-        forAll(lower, facei)
+        const scalar* const __restrict__ lowerPtr = lower.cbegin();
+        tensor4* __restrict__ blockLowerPtr = blockLower.begin();
+
+        auto LambdaLower = [=](label facei)
         {
-            blockLower[facei](row, col) = lower[facei];
-        }
+            blockLowerPtr[facei](row, col) = lowerPtr[facei];
+        };
+        exec.parallelFor(LambdaLower, lower.size());
     }
 
     const fvMesh& mesh = matrix.psi().mesh();
@@ -234,23 +277,28 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
             this->interfacesUpper().set
             (
                 patchi,
-                new Field<tensor4>(internal.size(), tensor4(Zero))
+                new Field<tensor4>(internal.size(), Zero)
             );
             this->interfacesLower().set
             (
                 patchi,
-                new Field<tensor4>(internal.size(), tensor4(Zero))
+                new Field<tensor4>(internal.size(), Zero)
             );
         }
 
-        Field<tensor4>& patchUpper = this->interfacesUpper()[patchi];
-        Field<tensor4>& patchLower = this->interfacesLower()[patchi];
+        const scalar* const __restrict__ internalPtr = internal.cbegin();
+        const scalar* const __restrict__ boundaryPtr = boundary.cbegin();
+        tensor4* __restrict__ patchUpperPtr =
+            this->interfacesUpper()[patchi].begin();
+        tensor4* __restrict__ patchLowerPtr =
+            this->interfacesLower()[patchi].begin();
 
-        forAll(internal, facei)
+        auto LambdaPatch = [=](label facei)
         {
-            patchUpper[facei](row, col) = -boundary[facei];
-            patchLower[facei](row, col) = internal[facei];
-        }
+            patchUpperPtr[facei](row, col) = -boundaryPtr[facei];
+            patchLowerPtr[facei](row, col) = internalPtr[facei];
+        };
+        exec.parallelFor(LambdaPatch, internal.size());
     }
 }
 
@@ -275,22 +323,40 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
     Field<tensor4>& blockLower = this->lower();
     Field<vector4>& blockSource = this->source();
 
-    forAll(blockDiag, celli)
+    foamExecutor exec;
+
     {
-        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        const vector* const __restrict__ diagPtr = matrix.diag().cbegin();
+        const vector* const __restrict__ sourcePtr = matrix.source().cbegin();
+        tensor4* __restrict__ blockDiagPtr = blockDiag.begin();
+        vector4* __restrict__ blockSourcePtr = blockSource.begin();
+
+        auto LambdaDiag = [=](label celli)
         {
-            blockDiag[celli](row + cmpt, col) = matrix.diag()[celli][cmpt];
-            blockSource[celli][row + cmpt] += matrix.source()[celli][cmpt];
-        }
+            for (direction cmpt = 0; cmpt < 3; ++cmpt)
+            {
+                blockDiagPtr[celli](row + cmpt, col) = diagPtr[celli][cmpt];
+                blockSourcePtr[celli][row + cmpt] += sourcePtr[celli][cmpt];
+            }
+        };
+        exec.parallelFor(LambdaDiag, blockDiag.size());
     }
 
-    forAll(blockUpper, facei)
     {
-        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        const vector* const __restrict__ upperPtr = matrix.upper().cbegin();
+        const vector* const __restrict__ lowerPtr = matrix.lower().cbegin();
+        tensor4* __restrict__ blockUpperPtr = blockUpper.begin();
+        tensor4* __restrict__ blockLowerPtr = blockLower.begin();
+
+        auto LambdaOffDiag = [=](label facei)
         {
-            blockUpper[facei](row + cmpt, col) = matrix.upper()[facei][cmpt];
-            blockLower[facei](row + cmpt, col) = matrix.lower()[facei][cmpt];
-        }
+            for (direction cmpt = 0; cmpt < 3; ++cmpt)
+            {
+                blockUpperPtr[facei](row + cmpt, col) = upperPtr[facei][cmpt];
+                blockLowerPtr[facei](row + cmpt, col) = lowerPtr[facei][cmpt];
+            }
+        };
+        exec.parallelFor(LambdaOffDiag, blockUpper.size());
     }
 
     this->interfacesUpper().resize(matrix.interfacesUpper().size());
@@ -306,7 +372,7 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
                 new Field<tensor4>
                 (
                     matrix.interfacesUpper()[patchi].size(),
-                    tensor4(Zero)
+                    Zero
                 )
             );
             this->interfacesLower().set
@@ -315,21 +381,29 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
                 new Field<tensor4>
                 (
                     matrix.interfacesLower()[patchi].size(),
-                    tensor4(Zero)
+                    Zero
                 )
             );
         }
 
-        forAll(matrix.interfacesUpper()[patchi], facei)
+        const vector* const __restrict__ srcUpperPtr =
+            matrix.interfacesUpper()[patchi].cbegin();
+        const vector* const __restrict__ srcLowerPtr =
+            matrix.interfacesLower()[patchi].cbegin();
+        tensor4* __restrict__ patchUpperPtr =
+            this->interfacesUpper()[patchi].begin();
+        tensor4* __restrict__ patchLowerPtr =
+            this->interfacesLower()[patchi].begin();
+
+        auto LambdaPatch = [=](label facei)
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                this->interfacesUpper()[patchi][facei](row + cmpt, col) =
-                    matrix.interfacesUpper()[patchi][facei][cmpt];
-                this->interfacesLower()[patchi][facei](row + cmpt, col) =
-                    matrix.interfacesLower()[patchi][facei][cmpt];
+                patchUpperPtr[facei](row + cmpt, col) = srcUpperPtr[facei][cmpt];
+                patchLowerPtr[facei](row + cmpt, col) = srcLowerPtr[facei][cmpt];
             }
-        }
+        };
+        exec.parallelFor(LambdaPatch, matrix.interfacesUpper()[patchi].size());
     }
 }
 
@@ -354,22 +428,40 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
     Field<tensor4>& blockLower = this->lower();
     Field<vector4>& blockSource = this->source();
 
-    forAll(blockDiag, celli)
+    foamExecutor exec;
+
     {
-        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        const vector* const __restrict__ diagPtr = matrix.diag().cbegin();
+        const scalar* const __restrict__ sourcePtr = matrix.source().cbegin();
+        tensor4* __restrict__ blockDiagPtr = blockDiag.begin();
+        vector4* __restrict__ blockSourcePtr = blockSource.begin();
+
+        auto LambdaDiag = [=](label celli)
         {
-            blockDiag[celli](row, col + cmpt) = matrix.diag()[celli][cmpt];
-        }
-        blockSource[celli][row] += matrix.source()[celli];
+            for (direction cmpt = 0; cmpt < 3; ++cmpt)
+            {
+                blockDiagPtr[celli](row, col + cmpt) = diagPtr[celli][cmpt];
+            }
+            blockSourcePtr[celli][row] += sourcePtr[celli];
+        };
+        exec.parallelFor(LambdaDiag, blockDiag.size());
     }
 
-    forAll(blockUpper, facei)
     {
-        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        const vector* const __restrict__ upperPtr = matrix.upper().cbegin();
+        const vector* const __restrict__ lowerPtr = matrix.lower().cbegin();
+        tensor4* __restrict__ blockUpperPtr = blockUpper.begin();
+        tensor4* __restrict__ blockLowerPtr = blockLower.begin();
+
+        auto LambdaOffDiag = [=](label facei)
         {
-            blockUpper[facei](row, col + cmpt) = matrix.upper()[facei][cmpt];
-            blockLower[facei](row, col + cmpt) = matrix.lower()[facei][cmpt];
-        }
+            for (direction cmpt = 0; cmpt < 3; ++cmpt)
+            {
+                blockUpperPtr[facei](row, col + cmpt) = upperPtr[facei][cmpt];
+                blockLowerPtr[facei](row, col + cmpt) = lowerPtr[facei][cmpt];
+            }
+        };
+        exec.parallelFor(LambdaOffDiag, blockUpper.size());
     }
 
     this->interfacesUpper().resize(matrix.interfacesUpper().size());
@@ -385,7 +477,7 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
                 new Field<tensor4>
                 (
                     matrix.interfacesUpper()[patchi].size(),
-                    tensor4(Zero)
+                    Zero
                 )
             );
             this->interfacesLower().set
@@ -394,21 +486,29 @@ void fvBlockMatrix<vector4, tensor4>::insertEquation
                 new Field<tensor4>
                 (
                     matrix.interfacesLower()[patchi].size(),
-                    tensor4(Zero)
+                    Zero
                 )
             );
         }
 
-        forAll(matrix.interfacesUpper()[patchi], facei)
+        const vector* const __restrict__ srcUpperPtr =
+            matrix.interfacesUpper()[patchi].cbegin();
+        const vector* const __restrict__ srcLowerPtr =
+            matrix.interfacesLower()[patchi].cbegin();
+        tensor4* __restrict__ patchUpperPtr =
+            this->interfacesUpper()[patchi].begin();
+        tensor4* __restrict__ patchLowerPtr =
+            this->interfacesLower()[patchi].begin();
+
+        auto LambdaPatch = [=](label facei)
         {
             for (direction cmpt = 0; cmpt < 3; ++cmpt)
             {
-                this->interfacesUpper()[patchi][facei](row, col + cmpt) =
-                    matrix.interfacesUpper()[patchi][facei][cmpt];
-                this->interfacesLower()[patchi][facei](row, col + cmpt) =
-                    matrix.interfacesLower()[patchi][facei][cmpt];
+                patchUpperPtr[facei](row, col + cmpt) = srcUpperPtr[facei][cmpt];
+                patchLowerPtr[facei](row, col + cmpt) = srcLowerPtr[facei][cmpt];
             }
-        }
+        };
+        exec.parallelFor(LambdaPatch, matrix.interfacesUpper()[patchi].size());
     }
 }
 
@@ -431,15 +531,24 @@ SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
 
     const fvMesh& mesh = U.mesh();
 
-    Field<vector4> psi(mesh.nCells(), vector4(Zero));
+    Field<vector4> psi(mesh.nCells(), Zero);
 
-    forAll(psi, celli)
+    foamExecutor exec;
+
+    vector4* __restrict__ psiPtr = psi.begin();
     {
-        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        const vector* const __restrict__ UPtr = U.primitiveField().cbegin();
+        const scalar* const __restrict__ pPtr = p.primitiveField().cbegin();
+
+        auto LambdaPack = [=](label celli)
         {
-            psi[celli][UCmpt + cmpt] = U[celli][cmpt];
-        }
-        psi[celli][pCmpt] = p[celli];
+            for (direction cmpt = 0; cmpt < 3; ++cmpt)
+            {
+                psiPtr[celli][UCmpt + cmpt] = UPtr[celli][cmpt];
+            }
+            psiPtr[celli][pCmpt] = pPtr[celli];
+        };
+        exec.parallelFor(LambdaPack, psi.size());
     }
 
     const lduInterfacePtrsList meshInterfaces = mesh.interfaces();
@@ -543,13 +652,19 @@ SolverPerformance<vector4> fvBlockMatrix<vector4, tensor4>::solve
         )
     );
 
-    forAll(psi, celli)
     {
-        for (direction cmpt = 0; cmpt < 3; ++cmpt)
+        vector* __restrict__ UPtr = U.primitiveFieldRef().begin();
+        scalar* __restrict__ pPtr = p.primitiveFieldRef().begin();
+
+        auto LambdaUnpack = [=](label celli)
         {
-            U[celli][cmpt] = psi[celli][UCmpt + cmpt];
-        }
-        p[celli] = psi[celli][pCmpt];
+            for (direction cmpt = 0; cmpt < 3; ++cmpt)
+            {
+                UPtr[celli][cmpt] = psiPtr[celli][UCmpt + cmpt];
+            }
+            pPtr[celli] = psiPtr[celli][pCmpt];
+        };
+        exec.parallelFor(LambdaUnpack, psi.size());
     }
 
     U.correctBoundaryConditions();
