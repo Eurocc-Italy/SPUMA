@@ -34,10 +34,6 @@ Description
     Steady-state incompressible solver with implicit pressure-velocity
     coupling in a vector4 block system.
 
-    The Rhie-Chow flux is selected with the fvSolution entry rhieChow:
-    coupled (default, interpolate(rAU)*interpolate(grad(p))) or segregated
-    (flux(rAU*grad(p)) with rAU of the relaxed UEqn, as simpleFoam).
-
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
@@ -72,20 +68,6 @@ int main(int argc, char *argv[])
     #include "initContinuityErrs.H"
 
     const scalar pAlpha = mesh.solutionDict().getOrDefault("pAlpha", 1.0);
-
-    const word rhieChow
-    (
-        mesh.solutionDict().getOrDefault<word>("rhieChow", "coupled")
-    );
-
-    if (rhieChow != "coupled" && rhieChow != "segregated")
-    {
-        FatalIOErrorInFunction(mesh.solutionDict())
-            << "Unknown rhieChow " << rhieChow
-            << ", valid options: coupled segregated" << exit(FatalIOError);
-    }
-
-    const bool segregatedRhieChow = (rhieChow == "segregated");
 
     turbulence->validate();
 

@@ -5,18 +5,9 @@
         - fvOptions(U)
     );
 
+    // Reciprocal momentum diagonal before relaxation
     volScalarField rAU(1.0/UEqn.A());
 
-    if (segregatedRhieChow)
-    {
-        // Relaxation only enters rAU; the block system is not relaxed
-        fvVectorMatrix UEqnRelaxed(UEqn);
-        UEqnRelaxed.relax();
-        rAU = 1.0/UEqnRelaxed.A();
-    }
-    else
-    {
-        UEqn.relax();
-    }
+    UEqn.relax();
 
     UpEqn.insertEquation(UEqn, 0, 0);

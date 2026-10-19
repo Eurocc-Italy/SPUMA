@@ -15,10 +15,6 @@ FoamFile
 
 pAlpha         1;
 
-// coupled: interpolate(rAU)*interpolate(grad(p)) (ICSFoam)
-// segregated: flux(rAU*grad(p)), rAU of the relaxed UEqn (as simpleFoam)
-rhieChow       coupled;
-
 solvers
 {
     Up

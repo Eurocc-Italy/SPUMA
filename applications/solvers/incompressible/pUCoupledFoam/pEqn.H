@@ -1,9 +1,7 @@
     surfaceScalarField presSource
     (
         "presSource",
-        segregatedRhieChow
-      ? pAlpha*fvc::flux(rAU*fvc::grad(p))
-      : pAlpha*fvc::interpolate(rAU)
+        pAlpha*fvc::interpolate(rAU)
        *(fvc::interpolate(fvc::grad(p)) & mesh.Sf())
     );
 
