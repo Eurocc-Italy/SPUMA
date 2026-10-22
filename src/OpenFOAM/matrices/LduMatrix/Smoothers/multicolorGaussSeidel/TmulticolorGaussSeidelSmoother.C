@@ -29,6 +29,8 @@ License
 
 #include "TmulticolorGaussSeidelSmoother.H"
 #include "PrecisionAdaptor.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -59,6 +61,14 @@ Foam::TmulticolorGaussSeidelSmoother<Type, DType, LUType>::TmulticolorGaussSeide
         if constexpr(std::is_same<DType, Type>::value)
         {
             rDPtr[celli] = cmptDivide(localOne, diagPtr[celli]);
+        }
+        else if constexpr
+        (
+            std::is_same<Type, vector4>::value
+         && std::is_same<DType, tensor4>::value
+        )
+        {
+            rDPtr[celli] = diagPtr[celli];
         }
         else
         {
@@ -204,6 +214,14 @@ void Foam::TmulticolorGaussSeidelSmoother<Type, DType, LUType>::smooth
                 if constexpr(std::is_same<DType, Type>::value)
                 {
                     psii = cmptMultiply(rDPtr[celli], psii);
+                }
+                else if constexpr
+                (
+                    std::is_same<Type, vector4>::value
+                 && std::is_same<DType, tensor4>::value
+                )
+                {
+                    psii = ::Foam::solve(rDPtr[celli], psii);
                 }
                 else
                 {

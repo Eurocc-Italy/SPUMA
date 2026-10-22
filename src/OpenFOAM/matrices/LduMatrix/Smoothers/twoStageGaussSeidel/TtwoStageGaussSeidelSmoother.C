@@ -29,6 +29,8 @@ License
 
 #include "TtwoStageGaussSeidelSmoother.H"
 #include "PrecisionAdaptor.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -59,6 +61,14 @@ Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::TtwoStageGaussSeidelSmo
         if constexpr(std::is_same<DType, Type>::value)
         {
             rDPtr[celli] = cmptDivide(localOne, diagPtr[celli]);
+        }
+        else if constexpr
+        (
+            std::is_same<Type, vector4>::value
+         && std::is_same<DType, tensor4>::value
+        )
+        {
+            rDPtr[celli] = diagPtr[celli];
         }
         else
         {
@@ -130,6 +140,19 @@ void Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::smooth
                 rDrPtr[celli] = cmptMultiply(rDPtr[celli], (bPtr[celli] - rDrPtr[celli]));
                 gPtr[celli] = rDrPtr[celli];
             }
+            else if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                rDrPtr[celli] = ::Foam::solve
+                (
+                    rDPtr[celli],
+                    bPtr[celli] - rDrPtr[celli]
+                );
+                gPtr[celli] = rDrPtr[celli];
+            }
             else
             {
                 rDrPtr[celli] = rDPtr[celli] * (bPtr[celli] - rDrPtr[celli]);
@@ -155,6 +178,22 @@ void Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::smooth
                     (
                         gPtr[uPtr[facei]],
                         cmptMultiply(-omega * rDPtr[uPtr[facei]], lowerPtr[facei] * gOldPtr[lPtr[facei]])
+                    );
+                }
+                else if constexpr
+                (
+                    std::is_same<Type, vector4>::value
+                 && std::is_same<DType, tensor4>::value
+                )
+                {
+                    foamAtomic::AtomicAdd
+                    (
+                        gPtr[uPtr[facei]],
+                        -omega * ::Foam::solve
+                        (
+                            rDPtr[uPtr[facei]],
+                            dot(lowerPtr[facei], gOldPtr[lPtr[facei]])
+                        )
                     );
                 }
                 else

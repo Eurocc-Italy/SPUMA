@@ -159,6 +159,53 @@ public:
 
     virtual void initInterfaceMatrixUpdate
     (
+        Field<Type>&,
+        const bool,
+        const lduAddressing&,
+        const label,
+        const Field<Type>& psiInternal,
+        const Field<tensor4>&,
+        const Pstream::commsTypes
+    ) const
+    {
+        const labelUList& faceCells = procInterface_.faceCells();
+
+        sendBuf_.resize_nocopy(faceCells.size());
+
+        forAll(faceCells, facei)
+        {
+            sendBuf_[facei] = psiInternal[faceCells[facei]];
+        }
+
+        recvBuf_.resize_nocopy(sendBuf_.size());
+
+        recvRequest_ = UPstream::nRequests();
+        UIPstream::read
+        (
+            Pstream::commsTypes::nonBlocking,
+            procInterface_.neighbProcNo(),
+            recvBuf_.data_bytes(),
+            recvBuf_.size_bytes(),
+            procInterface_.tag(),
+            procInterface_.comm()
+        );
+
+        sendRequest_ = UPstream::nRequests();
+        UOPstream::write
+        (
+            Pstream::commsTypes::nonBlocking,
+            procInterface_.neighbProcNo(),
+            sendBuf_.cdata_bytes(),
+            sendBuf_.size_bytes(),
+            procInterface_.tag(),
+            procInterface_.comm()
+        );
+
+        this->updatedMatrix(false);
+    }
+
+    virtual void initInterfaceMatrixUpdate
+    (
         solveScalarField&,
         const bool,
         const lduAddressing&,
@@ -258,6 +305,66 @@ public:
         }
 
         this->updatedMatrix(true);
+    }
+
+    virtual void updateInterfaceMatrix
+    (
+        Field<Type>& result,
+        const bool add,
+        const lduAddressing&,
+        const label,
+        const Field<Type>&,
+        const Field<tensor4>& coeffs,
+        const Pstream::commsTypes
+    ) const
+    {
+        if constexpr
+        (
+            std::is_same<Type, vector4>::value
+        )
+        {
+            if (this->updatedMatrix())
+            {
+                return;
+            }
+
+            if (recvRequest_ >= 0)
+            {
+                UPstream::waitRequest(recvRequest_);
+                recvRequest_ = -1;
+            }
+
+            if (sendRequest_ >= 0 && UPstream::finishedRequest(sendRequest_))
+            {
+                sendRequest_ = -1;
+            }
+
+            processorLduInterfaceField::transformCoupleField(recvBuf_);
+
+            const labelUList& faceCells = procInterface_.faceCells();
+            const label nFaces = min
+            (
+                faceCells.size(),
+                min(coeffs.size(), recvBuf_.size())
+            );
+
+            for (label facei = 0; facei < nFaces; ++facei)
+            {
+                // Coefficients are actual matrix entries, as on the fine level
+                if (add)
+                {
+                    result[faceCells[facei]] +=
+                        dot(coeffs[facei], recvBuf_[facei]);
+                }
+                else
+                {
+                    result[faceCells[facei]] -=
+                        dot(coeffs[facei], recvBuf_[facei]);
+                }
+            }
+
+            this->updatedMatrix(true);
+        }
     }
 
     virtual void updateInterfaceMatrix

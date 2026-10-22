@@ -39,6 +39,8 @@ License
 #include "scalarMatrices.H"
 #include "processorLduInterface.H"
 #include "cyclicLduInterface.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -1129,7 +1131,20 @@ void Foam::LduGAMGSolver<Type, DType, LUType>::scale
         }
         else
         {
-            fieldPtr[celli] = sf*fieldPtr[celli] + residual/diagPtr[celli];
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                fieldPtr[celli] =
+                    sf*fieldPtr[celli]
+                  + ::Foam::solve(diagPtr[celli], residual);
+            }
+            else
+            {
+                fieldPtr[celli] = sf*fieldPtr[celli] + residual/diagPtr[celli];
+            }
         }
     };
     exec.parallelFor(LambdaScale, nCells);
@@ -1202,7 +1217,19 @@ void Foam::LduGAMGSolver<Type, DType, LUType>::interpolate
         }
         else
         {
-            psiPtr[celli] = -ApsiPtr[celli]/diagPtr[celli];
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                psiPtr[celli] =
+                    -::Foam::solve(diagPtr[celli], ApsiPtr[celli]);
+            }
+            else
+            {
+                psiPtr[celli] = -ApsiPtr[celli]/diagPtr[celli];
+            }
         }
     };
     exec.parallelFor(LambdaDiag, nCells);
@@ -1247,7 +1274,7 @@ void Foam::LduGAMGSolver<Type, DType, LUType>::interpolate
         }
         else
         {
-            diagPsi = diagPtr[celli]*psiPtr[celli];
+            diagPsi = dot(diagPtr[celli], psiPtr[celli]);
         }
 
         foamAtomic::AtomicAdd
@@ -1271,9 +1298,22 @@ void Foam::LduGAMGSolver<Type, DType, LUType>::interpolate
         }
         else
         {
-            corrCPtr[coarseCelli] =
-                psiCPtr[coarseCelli]
-              - corrCPtr[coarseCelli]/diagCPtr[coarseCelli];
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                corrCPtr[coarseCelli] =
+                    psiCPtr[coarseCelli]
+                  - ::Foam::solve(diagCPtr[coarseCelli], corrCPtr[coarseCelli]);
+            }
+            else
+            {
+                corrCPtr[coarseCelli] =
+                    psiCPtr[coarseCelli]
+                  - corrCPtr[coarseCelli]/diagCPtr[coarseCelli];
+            }
         }
     };
     exec.parallelFor(LambdaCoarse, nCoarseCells);
@@ -2055,11 +2095,25 @@ Foam::LduGAMGSolver<Type, DType, LUType>::solve(Field<Type>& psi) const
 
     finestResidual = this->matrix_.source() - Apsi;
 
-    solverPerf.initialResidual() = cmptDivide
+    const auto initialResidual = cmptDivide
     (
         gSumCmptMag(finestResidual),
         normFactor
     );
+
+    if constexpr
+    (
+        std::is_same<Type, vector4>::value
+     && std::is_same<DType, tensor4>::value
+    )
+    {
+        solverPerf.initialResidual() = Type(initialResidual);
+    }
+    else
+    {
+        solverPerf.initialResidual() = initialResidual;
+    }
+
     solverPerf.finalResidual() = solverPerf.initialResidual();
 
     if ((this->log_ >= 2) || (LduMatrix<Type, DType, LUType>::debug >= 2))
@@ -2102,11 +2156,24 @@ Foam::LduGAMGSolver<Type, DType, LUType>::solve(Field<Type>& psi) const
             this->matrix_.Amul(Apsi, psi);
             finestResidual = this->matrix_.source() - Apsi;
 
-            solverPerf.finalResidual() = cmptDivide
+            const auto finalResidual = cmptDivide
             (
                 gSumCmptMag(finestResidual),
                 normFactor
             );
+
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                solverPerf.finalResidual() = Type(finalResidual);
+            }
+            else
+            {
+                solverPerf.finalResidual() = finalResidual;
+            }
 
             if ((this->log_ >= 2) || (LduMatrix<Type, DType, LUType>::debug >= 2))
             {

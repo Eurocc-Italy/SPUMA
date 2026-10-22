@@ -56,6 +56,21 @@ namespace Foam
     makeLduPreconditioner(NoPreconditioner, vector4, tensor4, tensor4);
     makeLduSymPreconditioner(NoPreconditioner, vector4, tensor4, tensor4);
     makeLduAsymPreconditioner(NoPreconditioner, vector4, tensor4, tensor4);
+    makeLduPreconditioner(DiagonalPreconditioner, vector4, tensor4, tensor4);
+    makeLduSymPreconditioner
+    (
+        DiagonalPreconditioner,
+        vector4,
+        tensor4,
+        tensor4
+    );
+    makeLduAsymPreconditioner
+    (
+        DiagonalPreconditioner,
+        vector4,
+        tensor4,
+        tensor4
+    );
 };
 
 

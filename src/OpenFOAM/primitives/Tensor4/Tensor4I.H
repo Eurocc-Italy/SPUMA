@@ -165,4 +165,29 @@ FOAM_DEVICE inline Foam::Vector4<Cmpt> Foam::solve
     );
 }
 
+
+template<class Cmpt>
+FOAM_DEVICE inline Foam::Tensor4<Cmpt> Foam::inv
+(
+    const Foam::Tensor4<Cmpt>& matrix
+)
+{
+    Tensor4<Cmpt> result(Zero);
+
+    for (direction column = 0; column < 4; ++column)
+    {
+        Vector4<Cmpt> unit(Zero);
+        unit[column] = Cmpt(1);
+
+        const Vector4<Cmpt> inverseColumn = solve(matrix, unit);
+
+        for (direction row = 0; row < 4; ++row)
+        {
+            result(row, column) = inverseColumn[row];
+        }
+    }
+
+    return result;
+}
+
 // ************************************************************************* //

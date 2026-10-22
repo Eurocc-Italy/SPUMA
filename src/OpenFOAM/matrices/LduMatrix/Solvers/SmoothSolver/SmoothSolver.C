@@ -27,6 +27,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "SmoothSolver.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -103,11 +105,24 @@ Foam::SmoothSolver<Type, DType, LUType>::solve(Field<Type>& psi) const
             normFactor = this->normFactor(psi, Apsi, temp);
 
             // Calculate residual magnitude
-            solverPerf.initialResidual() = cmptDivide
+            const auto initialResidual = cmptDivide
             (
                 gSumCmptMag(this->matrix_.source() - Apsi),
                 normFactor
             );
+
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                solverPerf.initialResidual() = Type(initialResidual);
+            }
+            else
+            {
+                solverPerf.initialResidual() = initialResidual;
+            }
             solverPerf.finalResidual() = solverPerf.initialResidual();
         }
 
@@ -147,11 +162,24 @@ Foam::SmoothSolver<Type, DType, LUType>::solve(Field<Type>& psi) const
                 );
 
                 // Calculate the residual to check convergence
-                solverPerf.finalResidual() = cmptDivide
+                const auto finalResidual = cmptDivide
                 (
                     gSumCmptMag(this->matrix_.residual(psi)),
                     normFactor
                 );
+
+                if constexpr
+                (
+                    std::is_same<Type, vector4>::value
+                 && std::is_same<DType, tensor4>::value
+                )
+                {
+                    solverPerf.finalResidual() = Type(finalResidual);
+                }
+                else
+                {
+                    solverPerf.finalResidual() = finalResidual;
+                }
             } while
             (
                 (

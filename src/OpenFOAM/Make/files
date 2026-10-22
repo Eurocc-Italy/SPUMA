@@ -552,6 +552,14 @@ $(LduMatrix)/LduMatrix/LduInterfaceField/LduInterfaceFields.C
 $(LduMatrix)/Smoothers/lduSmoothers.C
 $(LduMatrix)/Preconditioners/lduPreconditioners.C
 $(LduMatrix)/Solvers/lduSolvers.C
+$(LduMatrix)/Solvers/GAMG/interfaces/LduGAMGInterface.C
+$(LduMatrix)/Solvers/GAMG/interfaces/processorLduGAMGInterface.C
+$(LduMatrix)/Solvers/GAMG/interfaces/processorCyclicLduGAMGInterface.C
+$(LduMatrix)/Solvers/GAMG/interfaces/cyclicLduGAMGInterface.C
+$(LduMatrix)/Solvers/GAMG/GAMGAgglomerations/LduGAMGAgglomeration/LduGAMGAgglomeration.C
+$(LduMatrix)/Solvers/GAMG/GAMGAgglomerations/LduGAMGAgglomeration/LduGAMGAgglomerateLduAddressing.C
+$(LduMatrix)/Solvers/GAMG/GAMGAgglomerations/LduGAMGAgglomeration/LduGAMGAgglomerateProcAddressing.C
+$(LduMatrix)/Solvers/GAMG/GAMGAgglomerations/algebraicPairLduGAMGAgglomeration/algebraicPairLduGAMGAgglomeration.C
 
 primitiveShapes = meshes/primitiveShapes
 

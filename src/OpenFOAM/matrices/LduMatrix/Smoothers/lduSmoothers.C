@@ -30,6 +30,8 @@ License
 #include "TtwoStageGaussSeidelSmoother.H"
 #include "TmulticolorGaussSeidelSmoother.H"
 #include "fieldTypes.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 #define makeLduSmoothers(Type, DType, LUType)                                  \
                                                                                \
@@ -55,6 +57,8 @@ namespace Foam
     makeLduSmoothers(sphericalTensor, sphericalTensor, scalar);
     makeLduSmoothers(symmTensor, symmTensor, scalar);
     makeLduSmoothers(tensor, tensor, scalar);
+
+    makeLduSmoothers(vector4, tensor4, tensor4);
 };
 
 

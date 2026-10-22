@@ -276,6 +276,11 @@ FOAM_DEVICE inline Vector4<Cmpt> solve
 );
 
 
+//- Return the inverse of a Tensor4, column by column via solve()
+template<class Cmpt>
+FOAM_DEVICE inline Tensor4<Cmpt> inv(const Tensor4<Cmpt>& matrix);
+
+
 // * * * * * * * * * * * * * * * * Traits  * * * * * * * * * * * * * * * * //
 
 //- Data are contiguous if component type is contiguous

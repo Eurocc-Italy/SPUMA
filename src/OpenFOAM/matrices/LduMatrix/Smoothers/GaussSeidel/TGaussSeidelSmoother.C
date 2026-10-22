@@ -27,6 +27,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "TGaussSeidelSmoother.H"
+#include "tensor4.H"
+#include "vector4.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -56,7 +58,18 @@ Foam::TGaussSeidelSmoother<Type, DType, LUType>::TGaussSeidelSmoother
         }
         else
         {
-            rDPtr[celli] = inv(diagPtr[celli]);
+            if constexpr
+            (
+                std::is_same<Type, vector4>::value
+             && std::is_same<DType, tensor4>::value
+            )
+            {
+                rDPtr[celli] = diagPtr[celli];
+            }
+            else
+            {
+                rDPtr[celli] = inv(diagPtr[celli]);
+            }
         }
     }
 }
@@ -150,7 +163,18 @@ void Foam::TGaussSeidelSmoother<Type, DType, LUType>::smooth
             }
             else
             {
-                curPsi = dot(rDPtr[celli], curPsi);
+                if constexpr
+                (
+                    std::is_same<Type, vector4>::value
+                 && std::is_same<DType, tensor4>::value
+                )
+                {
+                    curPsi = solve(rDPtr[celli], curPsi);
+                }
+                else
+                {
+                    curPsi = dot(rDPtr[celli], curPsi);
+                }
             }
 
             // Distribute the neighbour side using current psi

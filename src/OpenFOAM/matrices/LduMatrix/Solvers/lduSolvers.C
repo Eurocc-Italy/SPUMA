@@ -29,6 +29,7 @@ License
 #include "PBiCCCG.H"
 #include "PBiCICG.H"
 #include "TPBiCGStab.H"
+#include "LduGAMGSolver.H"
 #include "SmoothSolver.H"
 #include "fieldTypes.H"
 #include "tensor4.H"
@@ -76,6 +77,12 @@ namespace Foam
     makeLduSolver(TPBiCGStab, vector4, tensor4, tensor4);
     makeLduSymSolver(TPBiCGStab, vector4, tensor4, tensor4);
     makeLduAsymSolver(TPBiCGStab, vector4, tensor4, tensor4);
+    makeLduSolver(SmoothSolver, vector4, tensor4, tensor4);
+    makeLduSymSolver(SmoothSolver, vector4, tensor4, tensor4);
+    makeLduAsymSolver(SmoothSolver, vector4, tensor4, tensor4);
+    makeLduSolver(LduGAMGSolver, vector4, tensor4, tensor4);
+    makeLduSymSolver(LduGAMGSolver, vector4, tensor4, tensor4);
+    makeLduAsymSolver(LduGAMGSolver, vector4, tensor4, tensor4);
 };
 
 

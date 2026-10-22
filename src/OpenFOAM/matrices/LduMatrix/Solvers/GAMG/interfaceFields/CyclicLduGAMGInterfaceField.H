@@ -118,6 +118,62 @@ public:
 
     virtual void updateInterfaceMatrix
     (
+        Field<Type>& result,
+        const bool add,
+        const lduAddressing&,
+        const label,
+        const Field<Type>& psiInternal,
+        const Field<tensor4>& coeffs,
+        const Pstream::commsTypes
+    ) const
+    {
+        if constexpr
+        (
+            std::is_same<Type, vector4>::value
+        )
+        {
+            const labelUList& faceCells = cyclicInterface_.faceCells();
+            const labelUList& neighbourFaceCells =
+                refCast<const cyclicLduGAMGInterface>
+                (
+                    cyclicInterface_.neighbPatch()
+                ).faceCells();
+
+            Field<Type> patchNeighbourField(neighbourFaceCells.size());
+
+            forAll(patchNeighbourField, facei)
+            {
+                patchNeighbourField[facei] =
+                    psiInternal[neighbourFaceCells[facei]];
+            }
+
+            cyclicLduInterfaceField::transformCoupleField(patchNeighbourField);
+
+            const label nFaces = min
+            (
+                faceCells.size(),
+                min(coeffs.size(), patchNeighbourField.size())
+            );
+
+            for (label facei = 0; facei < nFaces; ++facei)
+            {
+                // Coefficients are actual matrix entries, as on the fine level
+                if (add)
+                {
+                    result[faceCells[facei]] +=
+                        dot(coeffs[facei], patchNeighbourField[facei]);
+                }
+                else
+                {
+                    result[faceCells[facei]] -=
+                        dot(coeffs[facei], patchNeighbourField[facei]);
+                }
+            }
+        }
+    }
+
+    virtual void updateInterfaceMatrix
+    (
         solveScalarField& result,
         const bool add,
         const lduAddressing& lduAddr,
