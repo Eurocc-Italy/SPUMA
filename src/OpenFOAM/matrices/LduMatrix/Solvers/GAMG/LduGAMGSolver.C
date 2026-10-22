@@ -73,7 +73,7 @@ Foam::LduGAMGSolver<Type, DType, LUType>::LduGAMGSolver
     scaleCorrection_(matrix.symmetric()),
     directSolveCoarsest_(false),
 
-    agglomerationPtr_
+    agglomeration_
     (
         LduGAMGAgglomeration::New
         (
@@ -81,7 +81,6 @@ Foam::LduGAMGSolver<Type, DType, LUType>::LduGAMGSolver
             solverControls
         )
     ),
-    agglomeration_(agglomerationPtr_()),
 
     matrixLevels_(agglomeration_.size()),
     primitiveInterfaceLevels_(agglomeration_.size()),
@@ -500,6 +499,97 @@ void Foam::LduGAMGSolver<Type, DType, LUType>::agglomerateMatrix
     const labelList& faceRestrictAddr =
         agglomeration_.faceRestrictAddressing(fineLevelIndex);
     const boolList& faceFlipMap = agglomeration_.faceFlipMap(fineLevelIndex);
+
+    if constexpr (std::is_same<DType, LUType>::value)
+    {
+        if (faceRestrictAddr.usePool() && faceFlipMap.usePool())
+        {
+            const bool hasLower = fineMatrix.hasLower();
+
+            Field<LUType>& coarseUpper = coarseMatrix.upper();
+            coarseUpper.resize_nocopy(nCoarseFaces);
+            coarseUpper = Foam::zero{};
+
+            foamExecutor exec;
+            DType* __restrict__ coarseDiagPtr = coarseDiag.begin();
+            LUType* __restrict__ coarseUpperPtr = coarseUpper.begin();
+            const LUType* const __restrict__ fineUpperPtr =
+                fineMatrix.upper().cbegin();
+            const label* const __restrict__ faceRestrictPtr =
+                faceRestrictAddr.cbegin();
+            const bool* const __restrict__ faceFlipPtr = faceFlipMap.cbegin();
+
+            if (hasLower)
+            {
+                Field<LUType>& coarseLower = coarseMatrix.lower();
+                coarseLower.resize_nocopy(nCoarseFaces);
+                coarseLower = Foam::zero{};
+
+                LUType* __restrict__ coarseLowerPtr = coarseLower.begin();
+                const LUType* const __restrict__ fineLowerPtr =
+                    fineMatrix.lower().cbegin();
+
+                auto Lambda = [=](label fineFacei)
+                {
+                    const label coarseFace = faceRestrictPtr[fineFacei];
+
+                    if (coarseFace >= 0)
+                    {
+                        const bool flip = faceFlipPtr[fineFacei];
+
+                        foamAtomic::AtomicAdd
+                        (
+                            coarseUpperPtr[coarseFace],
+                            flip ? fineLowerPtr[fineFacei]
+                                 : fineUpperPtr[fineFacei]
+                        );
+                        foamAtomic::AtomicAdd
+                        (
+                            coarseLowerPtr[coarseFace],
+                            flip ? fineUpperPtr[fineFacei]
+                                 : fineLowerPtr[fineFacei]
+                        );
+                    }
+                    else
+                    {
+                        foamAtomic::AtomicAdd
+                        (
+                            coarseDiagPtr[-1 - coarseFace],
+                            fineUpperPtr[fineFacei] + fineLowerPtr[fineFacei]
+                        );
+                    }
+                };
+                exec.parallelFor(Lambda, faceRestrictAddr.size());
+            }
+            else
+            {
+                auto Lambda = [=](label fineFacei)
+                {
+                    const label coarseFace = faceRestrictPtr[fineFacei];
+
+                    if (coarseFace >= 0)
+                    {
+                        foamAtomic::AtomicAdd
+                        (
+                            coarseUpperPtr[coarseFace],
+                            fineUpperPtr[fineFacei]
+                        );
+                    }
+                    else
+                    {
+                        foamAtomic::AtomicAdd
+                        (
+                            coarseDiagPtr[-1 - coarseFace],
+                            2*fineUpperPtr[fineFacei]
+                        );
+                    }
+                };
+                exec.parallelFor(Lambda, faceRestrictAddr.size());
+            }
+
+            return;
+        }
+    }
 
     if (fineMatrix.hasLower())
     {

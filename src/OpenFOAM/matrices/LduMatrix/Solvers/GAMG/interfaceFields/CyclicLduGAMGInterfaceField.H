@@ -46,6 +46,35 @@ class CyclicLduGAMGInterfaceField
     bool doTransform_;
     int rank_;
 
+    //- Face cells and neighbour face cells in the memory pool, for the
+    //- device update of block coefficients (built on first use)
+    mutable labelList faceCellsPool_;
+    mutable labelList neighbFaceCellsPool_;
+
+    //- Neighbour values buffer for the block-coefficient update
+    mutable Field<Type> patchNeighbourField_;
+
+    void setPoolAddressing() const
+    {
+        if (faceCellsPool_.size() || !cyclicInterface_.faceCells().size())
+        {
+            return;
+        }
+
+        const labelUList& faceCells = cyclicInterface_.faceCells();
+        const labelUList& neighbFaceCells =
+            refCast<const cyclicLduGAMGInterface>
+            (
+                cyclicInterface_.neighbPatch()
+            ).faceCells();
+
+        faceCellsPool_ = labelList(faceCells.size(), poolSwitch(1));
+        faceCellsPool_.deepCopy(faceCells);
+
+        neighbFaceCellsPool_ = labelList(neighbFaceCells.size(), poolSwitch(1));
+        neighbFaceCellsPool_.deepCopy(neighbFaceCells);
+    }
+
 public:
 
     CyclicLduGAMGInterfaceField
@@ -57,7 +86,9 @@ public:
         LduInterfaceField<Type>(coarseInterface),
         cyclicInterface_(coarseInterface),
         doTransform_(false),
-        rank_(pTraits<Type>::rank)
+        rank_(pTraits<Type>::rank),
+        faceCellsPool_(poolSwitch(1)),
+        neighbFaceCellsPool_(poolSwitch(1))
     {
         const auto& cyclicField = refCast<const cyclicLduInterfaceField>
         (
@@ -132,43 +163,51 @@ public:
             std::is_same<Type, vector4>::value
         )
         {
-            const labelUList& faceCells = cyclicInterface_.faceCells();
-            const labelUList& neighbourFaceCells =
-                refCast<const cyclicLduGAMGInterface>
-                (
-                    cyclicInterface_.neighbPatch()
-                ).faceCells();
+            setPoolAddressing();
 
-            Field<Type> patchNeighbourField(neighbourFaceCells.size());
+            Field<Type>& patchNeighbourField = patchNeighbourField_;
+            patchNeighbourField.resize_nocopy(neighbFaceCellsPool_.size());
 
-            forAll(patchNeighbourField, facei)
+            foamExecutor exec;
             {
-                patchNeighbourField[facei] =
-                    psiInternal[neighbourFaceCells[facei]];
+                Type* __restrict__ pnfPtr = patchNeighbourField.begin();
+                const Type* const __restrict__ psiPtr = psiInternal.cbegin();
+                const label* const __restrict__ nbrFcPtr =
+                    neighbFaceCellsPool_.cbegin();
+
+                auto Lambda = [=](label facei)
+                {
+                    pnfPtr[facei] = psiPtr[nbrFcPtr[facei]];
+                };
+                exec.parallelFor(Lambda, patchNeighbourField.size());
             }
 
             cyclicLduInterfaceField::transformCoupleField(patchNeighbourField);
 
             const label nFaces = min
             (
-                faceCells.size(),
+                faceCellsPool_.size(),
                 min(coeffs.size(), patchNeighbourField.size())
             );
 
-            for (label facei = 0; facei < nFaces; ++facei)
+            Type* __restrict__ resultPtr = result.begin();
+            const tensor4* const __restrict__ coeffsPtr = coeffs.cbegin();
+            const Type* const __restrict__ pnfPtr =
+                patchNeighbourField.cbegin();
+            const label* const __restrict__ fcPtr = faceCellsPool_.cbegin();
+
+            // Coefficients are actual matrix entries, as on the fine level
+            const scalar sign = add ? 1 : -1;
+
+            auto Lambda = [=](label facei)
             {
-                // Coefficients are actual matrix entries, as on the fine level
-                if (add)
-                {
-                    result[faceCells[facei]] +=
-                        dot(coeffs[facei], patchNeighbourField[facei]);
-                }
-                else
-                {
-                    result[faceCells[facei]] -=
-                        dot(coeffs[facei], patchNeighbourField[facei]);
-                }
-            }
+                foamAtomic::AtomicAdd
+                (
+                    resultPtr[fcPtr[facei]],
+                    sign*dot(coeffsPtr[facei], pnfPtr[facei])
+                );
+            };
+            exec.parallelFor(Lambda, nFaces);
         }
     }
 

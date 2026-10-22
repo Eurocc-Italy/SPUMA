@@ -64,7 +64,11 @@ void Foam::LduGAMGAgglomeration::agglomerateLduAddressing
     labelList cCellnFaces(nCoarseCells, Zero);
     labelList cCellFaces(maxNnbrs*nCoarseCells);
 
-    faceRestrictAddressing_.set(fineLevelIndex, new labelList(nFineFaces));
+    faceRestrictAddressing_.set
+    (
+        fineLevelIndex,
+        new labelList(nFineFaces, poolSwitch(1))
+    );
     labelList& faceRestrictAddr = faceRestrictAddressing_[fineLevelIndex];
 
     labelList initCoarseNeighb(nFineFaces);
@@ -166,7 +170,11 @@ void Foam::LduGAMGAgglomeration::agglomerateLduAddressing
         }
     }
 
-    faceFlipMap_.set(fineLevelIndex, new boolList(nFineFaces, false));
+    faceFlipMap_.set
+    (
+        fineLevelIndex,
+        new boolList(nFineFaces, false, poolSwitch(1))
+    );
     boolList& faceFlipMap = faceFlipMap_[fineLevelIndex];
 
     forAll(faceRestrictAddr, fineFacei)
@@ -217,7 +225,12 @@ void Foam::LduGAMGAgglomeration::agglomerateLduAddressing
     patchFaceRestrictAddressing_.set
     (
         fineLevelIndex,
-        new labelListList(fineInterfaces.size())
+        new labelListList
+        (
+            fineInterfaces.size(),
+            labelList(poolSwitch(1)),
+            poolSwitch(1)
+        )
     );
     labelListList& patchFineToCoarse =
         patchFaceRestrictAddressing_[fineLevelIndex];

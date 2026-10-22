@@ -68,17 +68,61 @@ Foam::scalarField algebraicPairFaceWeights
     return upperWeights;
 }
 
+
+template<class Type>
+void prolongFieldDevice
+(
+    Foam::Field<Type>& fineField,
+    const Foam::Field<Type>& coarseField,
+    const Foam::labelUList& fineToCoarse
+)
+{
+    Foam::foamExecutor exec;
+    Type* __restrict__ finePtr = fineField.begin();
+    const Type* const __restrict__ coarsePtr = coarseField.cbegin();
+    const Foam::label* const __restrict__ fineToCoarsePtr =
+        fineToCoarse.cbegin();
+
+    auto Lambda = [=](Foam::label i)
+    {
+        finePtr[i] = coarsePtr[fineToCoarsePtr[i]];
+    };
+    exec.parallelFor(Lambda, fineToCoarse.size());
+}
+
 } // End anonymous namespace
 
 
 template<class Type, class DType, class LUType>
-Foam::autoPtr<Foam::LduGAMGAgglomeration>
+const Foam::LduGAMGAgglomeration&
 Foam::LduGAMGAgglomeration::New
 (
     const LduMatrix<Type, DType, LUType>& matrix,
     const dictionary& controlDict
 )
 {
+    const lduMesh& mesh = matrix.mesh();
+
+    const LduGAMGAgglomeration* agglomPtr =
+        mesh.thisDb().cfindObject<LduGAMGAgglomeration>
+        (
+            controlDict.getOrDefault<word>
+            (
+                "name",
+                LduGAMGAgglomeration::typeName
+            )
+        );
+
+    if (agglomPtr)
+    {
+        if (!agglomPtr->requireUpdate_)
+        {
+            return *agglomPtr;
+        }
+
+        mesh.thisDb().checkOut(const_cast<LduGAMGAgglomeration*>(agglomPtr));
+    }
+
     if (!matrix.hasUpper())
     {
         FatalErrorInFunction
@@ -86,12 +130,18 @@ Foam::LduGAMGAgglomeration::New
             << exit(FatalError);
     }
 
-    return LduGAMGAgglomeration::New
+
+    autoPtr<LduGAMGAgglomeration> newAgglomPtr
     (
-        matrix.mesh(),
-        algebraicPairFaceWeights(matrix),
-        controlDict
+        LduGAMGAgglomeration::New
+        (
+            mesh,
+            algebraicPairFaceWeights(matrix),
+            controlDict
+        )
     );
+
+    return regIOobject::store(newAgglomPtr);
 }
 
 
@@ -105,9 +155,25 @@ void Foam::LduGAMGAgglomeration::restrictField
 {
     coarseField = Zero;
 
-    forAll(fineField, i)
+    if (coarseField.usePool() && fineField.usePool() && fineToCoarse.usePool())
     {
-        coarseField[fineToCoarse[i]] += fineField[i];
+        foamExecutor exec;
+        Type* __restrict__ coarsePtr = coarseField.begin();
+        const Type* const __restrict__ finePtr = fineField.cbegin();
+        const label* const __restrict__ fineToCoarsePtr = fineToCoarse.cbegin();
+
+        auto Lambda = [=](label i)
+        {
+            foamAtomic::AtomicAdd(coarsePtr[fineToCoarsePtr[i]], finePtr[i]);
+        };
+        exec.parallelFor(Lambda, fineField.size());
+    }
+    else
+    {
+        forAll(fineField, i)
+        {
+            coarseField[fineToCoarse[i]] += fineField[i];
+        }
     }
 }
 
@@ -236,6 +302,13 @@ void Foam::LduGAMGAgglomeration::prolongField
             fineField[i] = allCf[fineToCoarse[i]];
         }
     }
+    else if
+    (
+        fineField.usePool() && coarseField.usePool() && fineToCoarse.usePool()
+    )
+    {
+        prolongFieldDevice(fineField, coarseField, fineToCoarse);
+    }
     else
     {
         forAll(fineToCoarse, i)
@@ -289,9 +362,21 @@ const Foam::Field<Type>& Foam::LduGAMGAgglomeration::prolongField
     }
     else
     {
-        forAll(fineToCoarse, i)
+        if
+        (
+            fineField.usePool()
+         && coarseField.usePool()
+         && fineToCoarse.usePool()
+        )
         {
-            fineField[i] = coarseField[fineToCoarse[i]];
+            prolongFieldDevice(fineField, coarseField, fineToCoarse);
+        }
+        else
+        {
+            forAll(fineToCoarse, i)
+            {
+                fineField[i] = coarseField[fineToCoarse[i]];
+            }
         }
         return coarseField;
     }

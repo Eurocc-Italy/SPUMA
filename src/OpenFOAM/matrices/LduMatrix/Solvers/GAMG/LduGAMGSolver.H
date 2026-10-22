@@ -91,10 +91,7 @@ protected:
         //- Direct or iteratively solve the coarsest level
         bool directSolveCoarsest_;
 
-        //- The native agglomeration hierarchy storage
-        autoPtr<LduGAMGAgglomeration> agglomerationPtr_;
-
-        //- The agglomeration hierarchy view
+        //- The agglomeration hierarchy (registered on the mesh)
         const LduGAMGAgglomeration& agglomeration_;
 
         //- Hierarchy of matrix levels

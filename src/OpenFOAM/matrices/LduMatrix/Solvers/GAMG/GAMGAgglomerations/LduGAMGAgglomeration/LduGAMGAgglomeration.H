@@ -29,6 +29,10 @@ Class
 Description
     Native serial GAMG agglomeration hierarchy for coupled LduMatrix solvers.
 
+    As GAMGAgglomeration, the hierarchy is a MeshObject: it is built from the
+    first matrix and reused by the following solves, and rebuilt after mesh
+    motion every updateInterval time steps.
+
 SourceFiles
     LduGAMGAgglomeration.C
     LduGAMGAgglomerationTemplates.C
@@ -46,17 +50,36 @@ SourceFiles
 #include "primitiveFields.H"
 #include "UPstream.H"
 #include "DynamicList.H"
+#include "MeshObject.H"
 
 namespace Foam
 {
 class LduGAMGAgglomeration
+:
+    public MeshObject<lduMesh, MoveableMeshObject, LduGAMGAgglomeration>
 {
+    // Private Typedefs
+
+        typedef MeshObject
+        <
+            lduMesh,
+            MoveableMeshObject,
+            LduGAMGAgglomeration
+        > MeshObject_type;
+
+
 protected:
 
     // Protected Data
 
         //- Maximum number of agglomerated levels.
         const label maxLevels_;
+
+        //- Rebuild interval (time steps) after mesh motion
+        const label updateInterval_;
+
+        //- Rebuild required on the next New()
+        mutable bool requireUpdate_;
 
         //- Number of cells in the coarsest level.
         label nCellsInCoarsestLevel_;
@@ -242,14 +265,26 @@ protected:
 
 public:
 
+    //- Static type name and debug switch (type() is provided by the
+    //- concrete agglomerators)
+    ClassName("LduGAMGAgglomeration");
+
     virtual ~LduGAMGAgglomeration() = default;
 
+    //- Return the agglomeration registered on the matrix mesh, building it
+    //- from the matrix coefficients if absent or out of date
     template<class Type, class DType, class LUType>
-    static autoPtr<LduGAMGAgglomeration> New
+    static const LduGAMGAgglomeration& New
     (
         const LduMatrix<Type, DType, LUType>& matrix,
         const dictionary& controlDict
     );
+
+    //- Does the agglomeration need to be rebuilt at this time step
+    bool requiresUpdate() const;
+
+    //- Flag a rebuild after mesh motion
+    virtual bool movePoints();
 
     label size() const
     {

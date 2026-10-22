@@ -52,6 +52,21 @@ class ProcessorLduGAMGInterfaceField
     mutable solveScalarField scalarSendBuf_;
     mutable solveScalarField scalarRecvBuf_;
 
+    //- Face cells in the memory pool, for the device update of block
+    //- coefficients (built on first use)
+    mutable labelList faceCellsPool_;
+
+    void setPoolAddressing() const
+    {
+        const labelUList& faceCells = procInterface_.faceCells();
+
+        if (faceCellsPool_.size() != faceCells.size())
+        {
+            faceCellsPool_ = labelList(faceCells.size(), poolSwitch(1));
+            faceCellsPool_.deepCopy(faceCells);
+        }
+    }
+
 public:
 
     ProcessorLduGAMGInterfaceField
@@ -65,7 +80,8 @@ public:
         doTransform_(false),
         rank_(pTraits<Type>::rank),
         sendRequest_(-1),
-        recvRequest_(-1)
+        recvRequest_(-1),
+        faceCellsPool_(poolSwitch(1))
     {
         const auto& processorField =
             refCast<const processorLduInterfaceField>(fineInterface);
@@ -87,7 +103,8 @@ public:
         doTransform_(doTransform),
         rank_(rank),
         sendRequest_(-1),
-        recvRequest_(-1)
+        recvRequest_(-1),
+        faceCellsPool_(poolSwitch(1))
     {}
 
     virtual bool ready() const
@@ -168,16 +185,21 @@ public:
         const Pstream::commsTypes
     ) const
     {
-        const labelUList& faceCells = procInterface_.faceCells();
+        setPoolAddressing();
 
-        sendBuf_.resize_nocopy(faceCells.size());
-
-        forAll(faceCells, facei)
-        {
-            sendBuf_[facei] = psiInternal[faceCells[facei]];
-        }
-
+        sendBuf_.resize_nocopy(faceCellsPool_.size());
         recvBuf_.resize_nocopy(sendBuf_.size());
+
+        foamExecutor exec;
+        Type* __restrict__ sendBufPtr = sendBuf_.begin();
+        const Type* const __restrict__ psiPtr = psiInternal.cbegin();
+        const label* const __restrict__ fcPtr = faceCellsPool_.cbegin();
+
+        auto Lambda = [=](label facei)
+        {
+            sendBufPtr[facei] = psiPtr[fcPtr[facei]];
+        };
+        exec.parallelFor(Lambda, sendBuf_.size());
 
         recvRequest_ = UPstream::nRequests();
         UIPstream::read
@@ -341,27 +363,32 @@ public:
 
             processorLduInterfaceField::transformCoupleField(recvBuf_);
 
-            const labelUList& faceCells = procInterface_.faceCells();
+            setPoolAddressing();
+
             const label nFaces = min
             (
-                faceCells.size(),
+                faceCellsPool_.size(),
                 min(coeffs.size(), recvBuf_.size())
             );
 
-            for (label facei = 0; facei < nFaces; ++facei)
+            foamExecutor exec;
+            Type* __restrict__ resultPtr = result.begin();
+            const tensor4* const __restrict__ coeffsPtr = coeffs.cbegin();
+            const Type* const __restrict__ recvBufPtr = recvBuf_.cbegin();
+            const label* const __restrict__ fcPtr = faceCellsPool_.cbegin();
+
+            // Coefficients are actual matrix entries, as on the fine level
+            const scalar sign = add ? 1 : -1;
+
+            auto Lambda = [=](label facei)
             {
-                // Coefficients are actual matrix entries, as on the fine level
-                if (add)
-                {
-                    result[faceCells[facei]] +=
-                        dot(coeffs[facei], recvBuf_[facei]);
-                }
-                else
-                {
-                    result[faceCells[facei]] -=
-                        dot(coeffs[facei], recvBuf_[facei]);
-                }
-            }
+                foamAtomic::AtomicAdd
+                (
+                    resultPtr[fcPtr[facei]],
+                    sign*dot(coeffsPtr[facei], recvBufPtr[facei])
+                );
+            };
+            exec.parallelFor(Lambda, nFaces);
 
             this->updatedMatrix(true);
         }

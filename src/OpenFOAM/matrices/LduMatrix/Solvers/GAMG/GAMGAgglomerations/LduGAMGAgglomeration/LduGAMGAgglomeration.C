@@ -28,9 +28,13 @@ License
 #include "LduGAMGAgglomeration.H"
 #include "algebraicPairLduGAMGAgglomeration.H"
 #include "dictionary.H"
+#include "Time.H"
 
 namespace Foam
 {
+
+defineTypeNameAndDebug(LduGAMGAgglomeration, 0);
+
 
 LduGAMGAgglomeration::LduGAMGAgglomeration
 (
@@ -38,7 +42,18 @@ LduGAMGAgglomeration::LduGAMGAgglomeration
     const dictionary& controlDict
 )
 :
+    MeshObject_type
+    (
+        controlDict.getOrDefault<word>
+        (
+            "name",
+            LduGAMGAgglomeration::typeName
+        ),
+        mesh
+    ),
     maxLevels_(50),
+    updateInterval_(controlDict.getOrDefault<label>("updateInterval", 1)),
+    requireUpdate_(false),
     nCellsInCoarsestLevel_
     (
         controlDict.getOrDefault<label>("nCellsInCoarsestLevel", 10)
@@ -119,6 +134,25 @@ LduGAMGAgglomeration::LduGAMGAgglomeration
             << procAgglomeratorType << "'. Only 'masterCoarsest' is"
             << " implemented in the native path" << exit(FatalError);
     }
+}
+
+
+bool LduGAMGAgglomeration::requiresUpdate() const
+{
+    return
+        (updateInterval_ > 0)
+     && ((mesh_.thisDb().time().timeIndex() % updateInterval_) == 0);
+}
+
+
+bool LduGAMGAgglomeration::movePoints()
+{
+    if (requiresUpdate())
+    {
+        requireUpdate_ = true;
+    }
+
+    return requireUpdate_;
 }
 
 
