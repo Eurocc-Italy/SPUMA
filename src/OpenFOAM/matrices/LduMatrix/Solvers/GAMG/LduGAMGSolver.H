@@ -54,8 +54,9 @@ class LduGAMGSolver
 :
     public LduMatrix<Type, DType, LUType>::solver
 {
+protected:
 
-    // Private Data
+    // Protected Data
 
         //- Number of pre-smoothing sweeps
         label nPreSweeps_;
@@ -129,7 +130,7 @@ class LduGAMGSolver
         //- Per-rank cell offsets into the gathered coarsest matrix
         labelList coarsestProcOffsets_;
 
-    // Private Member Functions
+    // Protected Member Functions
 
         //- Return the matrix for a given GAMG level
         const LduMatrix<Type, DType, LUType>& matrixLevel(const label) const;

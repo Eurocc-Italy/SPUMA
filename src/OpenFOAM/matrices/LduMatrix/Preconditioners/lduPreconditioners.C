@@ -28,6 +28,7 @@ License
 #include "NoPreconditioner.H"
 #include "DiagonalPreconditioner.H"
 #include "TDILUPreconditioner.H"
+#include "LduGAMGPreconditioner.H"
 #include "fieldTypes.H"
 #include "tensor4.H"
 #include "vector4.H"
@@ -67,6 +68,21 @@ namespace Foam
     makeLduAsymPreconditioner
     (
         DiagonalPreconditioner,
+        vector4,
+        tensor4,
+        tensor4
+    );
+    makeLduPreconditioner(LduGAMGPreconditioner, vector4, tensor4, tensor4);
+    makeLduSymPreconditioner
+    (
+        LduGAMGPreconditioner,
+        vector4,
+        tensor4,
+        tensor4
+    );
+    makeLduAsymPreconditioner
+    (
+        LduGAMGPreconditioner,
         vector4,
         tensor4,
         tensor4
