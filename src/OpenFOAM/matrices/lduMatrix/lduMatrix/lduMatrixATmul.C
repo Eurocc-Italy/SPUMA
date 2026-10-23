@@ -64,6 +64,7 @@ void Foam::lduMatrix::Amul
 
     //get executor
     foamExecutor exec;
+
     // Initialise the update of interfaced interfaces
     initMatrixInterfaces
     (
@@ -94,10 +95,8 @@ void Foam::lduMatrix::Amul
         const scalar* const __restrict__ lowercsrPtr = lowerCSR().begin();
 
         auto LambdaAmul = [=](label cell)
-	{
-            auto& val = ApsiPtr[cell];
-
-            val = diagPtr[cell]*psiPtr[cell];
+        {
+            solveScalar val = diagPtr[cell]*psiPtr[cell];
 
             // Add lower contributions
             {
@@ -110,6 +109,7 @@ void Foam::lduMatrix::Amul
                     val += lowercsrPtr[i]*psiPtr[nbrCell];
                 }
             }
+
             // Add upper contributions
             {
                 const label start = oStartPtr[cell];
@@ -121,6 +121,8 @@ void Foam::lduMatrix::Amul
                     val += upperPtr[i]*psiPtr[nbrCell];
                 }
             }
+
+            ApsiPtr[cell] = val;
         };
         exec.parallelFor(LambdaAmul, nCells);
     }
@@ -234,6 +236,8 @@ void Foam::lduMatrix::sumA
     const lduInterfaceFieldPtrsList& interfaces
 ) const
 {
+    const auto& addr = lduAddr();
+
     solveScalar* __restrict__ sumAPtr = sumA.begin();
 
     const scalar* __restrict__ diagPtr = diag().begin();
@@ -249,18 +253,71 @@ void Foam::lduMatrix::sumA
 
     foamExecutor exec;
 
-    auto LambdaDiag = [=](label cell)
-    {
-        sumAPtr[cell] = diagPtr[cell];
-    };
-    exec.parallelFor(LambdaDiag,nCells);
+    const bool useLowerCSR = false;
 
-    auto LambdaOffDiag = [=](label face)
+    if (useLowerCSR)
     {
-        foamAtomic::AtomicAdd(sumAPtr[uPtr[face]], lowerPtr[face]);
-        foamAtomic::AtomicAdd(sumAPtr[lPtr[face]], upperPtr[face]);
-    };
-    exec.parallelFor(LambdaOffDiag,nFaces);
+        // Use cell-based looping
+        if (debug == 2) PoutInFunction<< "cell-based looping" << endl;
+
+        const label* const __restrict__ oStartPtr =
+            addr.ownerStartAddr().begin();
+        const label* const __restrict__ loStartPtr =
+            addr.losortStartAddr().begin();
+        const label* const __restrict__ lcsrPtr =
+            addr.lowerCSRAddr().begin();
+
+        // Note: lowerCSR constructed from lower if available, upper otherwise
+        //       so is handling symmetric()
+        const scalar* const __restrict__ lowercsrPtr = lowerCSR().begin();
+
+        auto LambdaAmul = [=](label cell)
+        {
+            solveScalar val = diagPtr[cell];
+
+            // Add lower contributions
+            {
+                const label start = loStartPtr[cell];
+                const label end = loStartPtr[cell+1];
+
+                for (label i = start; i < end; i++)
+                {
+                    val += lowercsrPtr[i];
+                }
+            }
+
+            // Add upper contributions
+            {
+                const label start = oStartPtr[cell];
+                const label end = oStartPtr[cell+1];
+
+                for (label i = start; i < end; i++)
+                {
+                    val += upperPtr[i];
+                }
+            }
+
+            sumAPtr[cell] = val;
+        };
+        exec.parallelFor(LambdaAmul, nCells);
+    }
+    else
+    {
+        if (debug == 2) PoutInFunction<< "ldu-based looping" << endl;
+
+        auto LambdaDiag = [=](label cell)
+        {
+            sumAPtr[cell] = diagPtr[cell];
+        };
+        exec.parallelFor(LambdaDiag,nCells);
+
+        auto LambdaOffDiag = [=](label face)
+        {
+            foamAtomic::AtomicAdd(sumAPtr[uPtr[face]], lowerPtr[face]);
+            foamAtomic::AtomicAdd(sumAPtr[lPtr[face]], upperPtr[face]);
+        };
+        exec.parallelFor(LambdaOffDiag,nFaces);
+    }
 
     // Add the interface internal coefficients to diagonal
     // and the interface boundary coefficients to the sum-off-diagonal
@@ -293,6 +350,8 @@ void Foam::lduMatrix::residual
     const direction cmpt
 ) const
 {
+    const auto& addr = lduAddr();
+
     solveScalar* __restrict__ rAPtr = rA.begin();
 
     const solveScalar* const __restrict__ psiPtr = psi.begin();
@@ -333,20 +392,74 @@ void Foam::lduMatrix::residual
 
     const label nCells = diag().size();
 
-    auto LambdaDiag = [=](label cell)
-    {
-        rAPtr[cell] = sourcePtr[cell] - diagPtr[cell]*psiPtr[cell];
-    };
-    exec.parallelFor(LambdaDiag, nCells);
+    const bool useLowerCSR = false;
 
-    const label nFaces = upper().size();
-
-    auto LambdaOffDiag = [=](label face)
+    if (useLowerCSR)
     {
-        foamAtomic::AtomicAdd(rAPtr[uPtr[face]], -lowerPtr[face]*psiPtr[lPtr[face]]);
-        foamAtomic::AtomicAdd(rAPtr[lPtr[face]], -upperPtr[face]*psiPtr[uPtr[face]]);
-    };
-    exec.parallelFor(LambdaOffDiag,nFaces);
+        // Use cell-based looping
+        if (debug == 2) PoutInFunction<< "cell-based looping" << endl;
+
+        const label* const __restrict__ oStartPtr =
+            addr.ownerStartAddr().begin();
+        const label* const __restrict__ loStartPtr =
+            addr.losortStartAddr().begin();
+        const label* const __restrict__ lcsrPtr =
+            addr.lowerCSRAddr().begin();
+
+        // Note: lowerCSR constructed from lower if available, upper otherwise
+        //       so is handling symmetric()
+        const scalar* const __restrict__ lowercsrPtr = lowerCSR().begin();
+
+        auto LambdaAmul = [=](label cell)
+        {
+            solveScalar val = sourcePtr[cell] - diagPtr[cell]*psiPtr[cell];
+
+            // Add lower contributions
+            {
+                const label start = loStartPtr[cell];
+                const label end = loStartPtr[cell+1];
+
+                for (label i = start; i < end; i++)
+                {
+                    const label nbrCell = lcsrPtr[i];
+                    val -= lowercsrPtr[i]*psiPtr[nbrCell];
+                }
+            }
+            // Add upper contributions
+            {
+                const label start = oStartPtr[cell];
+                const label end = oStartPtr[cell+1];
+
+                for (label i = start; i < end; i++)
+                {
+                    const label nbrCell = uPtr[i];
+                    val -= upperPtr[i]*psiPtr[nbrCell];
+                }
+            }
+
+            rAPtr[cell] = val;
+        };
+        exec.parallelFor(LambdaAmul, nCells);
+    }
+    else
+    {
+        if (debug == 2) PoutInFunction<< "ldu-based looping" << endl;
+
+        auto LambdaDiag = [=](label cell)
+        {
+            rAPtr[cell] = sourcePtr[cell] - diagPtr[cell]*psiPtr[cell];
+        };
+        exec.parallelFor(LambdaDiag, nCells);
+
+        const label nFaces = upper().size();
+
+        auto LambdaOffDiag = [=](label face)
+        {
+            foamAtomic::AtomicAdd(rAPtr[uPtr[face]], -lowerPtr[face]*psiPtr[lPtr[face]]);
+            foamAtomic::AtomicAdd(rAPtr[lPtr[face]], -upperPtr[face]*psiPtr[uPtr[face]]);
+        };
+        exec.parallelFor(LambdaOffDiag,nFaces);
+    }
 
     // Update interface interfaces
     updateMatrixInterfaces
