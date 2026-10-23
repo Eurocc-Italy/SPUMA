@@ -20,7 +20,11 @@ solvers
     Up
     {
         solver          PBiCGStab;
-        preconditioner  none;
+        preconditioner  GAMG;
+        smoother        twoStageGaussSeidel;
+        agglomerator    algebraicPair;
+        nVcycles        1;
+        nCoarsestSweeps 4;
         tolerance       (1e-15 1e-15 1e-15 1e-15);
         relTol          (0 0 0 0);
         minIter         1;
