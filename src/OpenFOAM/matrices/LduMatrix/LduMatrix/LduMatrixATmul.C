@@ -86,7 +86,7 @@ void Foam::LduMatrix<Type, DType, LUType>::Amul
 
         auto LambdaAmul = [=](label cell)
         {
-            auto& val = ApsiPtr[cell];
+            auto val;
 
             if constexpr(std::is_same<DType, Type>::value)
             {
@@ -108,6 +108,7 @@ void Foam::LduMatrix<Type, DType, LUType>::Amul
                     val += dot(lowercsrPtr[i], psiPtr[nbrCell]);
                 }
             }
+
             // Add upper contributions
             {
                 const label start = oStartPtr[cell];
@@ -119,6 +120,8 @@ void Foam::LduMatrix<Type, DType, LUType>::Amul
                     val += dot(upperPtr[i], psiPtr[nbrCell]);
                 }
             }
+
+            ApsiPtr[cell] = val;
         };
         exec.parallelFor(LambdaAmul, nCells);
     }
@@ -273,7 +276,7 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
 
         auto LambdaAmul = [=](label cell)
         {
-            auto& val = sumAPtr[cell];
+            auto val;
 
             if constexpr(std::is_same<DType, Type>::value)
             {
@@ -294,6 +297,7 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
                     val += dot(lowercsrPtr[i], localOne);
                 }
             }
+
             // Add upper contributions
             {
                 const label start = oStartPtr[cell];
@@ -304,6 +308,8 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
                     val += dot(upperPtr[i], localOne);
                 }
             }
+
+            sumAPtr[cell] = val;
         };
         exec.parallelFor(LambdaAmul, nCells);
     }
@@ -410,7 +416,7 @@ void Foam::LduMatrix<Type, DType, LUType>::residual
 
         auto LambdaAmul = [=](label cell)
         {
-            auto& val = rAPtr[cell];
+            auto val;
 
             if constexpr(std::is_same<DType, Type>::value)
             {
@@ -432,6 +438,7 @@ void Foam::LduMatrix<Type, DType, LUType>::residual
                     val -= dot(lowercsrPtr[i], psiPtr[nbrCell]);
                 }
             }
+
             // Add upper contributions
             {
                 const label start = oStartPtr[cell];
@@ -443,6 +450,8 @@ void Foam::LduMatrix<Type, DType, LUType>::residual
                     val -= dot(upperPtr[i], psiPtr[nbrCell]);
                 }
             }
+
+            rAPtr[cell] = val;
         };
         exec.parallelFor(LambdaAmul, nCells);
     }
