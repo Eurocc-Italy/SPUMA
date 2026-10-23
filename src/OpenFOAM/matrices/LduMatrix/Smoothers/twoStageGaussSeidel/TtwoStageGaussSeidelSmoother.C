@@ -93,10 +93,12 @@ void Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::smooth
     const LUType* const __restrict__ lowerPtr =
         matrix_.lower().begin();
 
+    const auto& addr =  matrix_.lduAddr();
+
     const label* const __restrict__ uPtr =
-        matrix_.lduAddr().upperAddr().begin();
+        addr.upperAddr().begin();
     const label* const __restrict__ lPtr =
-        matrix_.lduAddr().lowerAddr().begin();
+        addr.lowerAddr().begin();
 
     Field<Type> rDr(nCells);
     Type* __restrict__ rDrPtr = rDr.begin();
@@ -127,13 +129,17 @@ void Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::smooth
         {
             if constexpr(std::is_same<DType, Type>::value)
             {
-                rDrPtr[celli] = cmptMultiply(rDPtr[celli], (bPtr[celli] - rDrPtr[celli]));
-                gPtr[celli] = rDrPtr[celli];
+                const Type rDr = cmptMultiply(rDPtr[celli], (bPtr[celli] - rDrPtr[celli]));
+                rDrPtr[celli] = rDr;
+                gPtr[celli] = rDr;
+                gOldPtr[celli] = rDr;
             }
             else
             {
-                rDrPtr[celli] = rDPtr[celli] * (bPtr[celli] - rDrPtr[celli]);
-                gPtr[celli] = rDrPtr[celli];
+                const Type rDr = rDPtr[celli] * (bPtr[celli] - rDrPtr[celli]);
+                rDrPtr[celli] = rDr;
+                gPtr[celli] = rDr;
+                gOldPtr[celli] = rDr;
             }
         };
         exec.parallelFor(LambdarDr, nCells);
@@ -141,32 +147,80 @@ void Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::smooth
         // --- Perform local inner (nInnerIter) Jacobi iterations
         for (label j=0; j<nInnerIter; ++j)
         {
-            gOld = g;
-
             if (j != 0)
+            {
+                gOld = g;
                 g = rDr;
+            }
 
             // --- Multiply g by the matrix omega * D^-1 * L
-            auto Lambdag = [=](label facei)
+            if (hasLowerCSR())
             {
-                if constexpr(std::is_same<DType, Type>::value)
+                const label* const __restrict__ loStartPtr =
+                    addr.losortStartAddr().begin();
+                const label* const __restrict__ lcsrPtr =
+                    addr.lowerCSRAddr().begin();
+                const scalar* const __restrict__ lowercsrPtr =
+                    matrix_.lowerCSR().begin();
+
+                auto Lambdag = [=](label celli)
                 {
-                    foamAtomic::AtomicAdd
-                    (
-                        gPtr[uPtr[facei]],
-                        cmptMultiply(-omega * rDPtr[uPtr[facei]], lowerPtr[facei] * gOldPtr[lPtr[facei]])
-                    );
-                }
-                else
+                    if constexpr(std::is_same<DType, Type>::value)
+                    {
+                        const label start = loStartPtr[celli];
+                        const label end = loStartPtr[celli + 1];
+                        Type val = Zero;
+
+                        for (label i = start; i < end; i++)
+                        {
+                            const label nbrCell = lcsrPtr[i];
+                            val += lowercsrPtr[i] * gOldPtr[nbrCell];
+                        }
+
+                        val = cmptMultiply(val, -omega * rDPtr[celli]);
+                        gPtr[celli] += val;
+                    }
+                    else
+                    {
+                        const label start = loStartPtr[celli];
+                        const label end = loStartPtr[celli + 1];
+                        Type val = Zero;
+
+                        for (label i = start; i < end; i++)
+                        {
+                            const label nbrCell = lcsrPtr[i];
+                            val += lowercsrPtr[i] * gOldPtr[nbrCell];
+                        }
+
+                        val *= -omega * rDPtr[celli];
+                        gPtr[celli] += val;
+                   }
+                };
+                exec.parallelFor(Lambdag, nCells);
+            }
+            else
+            {
+                auto Lambdag = [=](label facei)
                 {
-                    foamAtomic::AtomicAdd
-                    (
-                        gPtr[uPtr[facei]],
-                       -omega * rDPtr[uPtr[facei]] * lowerPtr[facei] * gOldPtr[lPtr[facei]]
-                    );
-                }
-            };
-            exec.parallelFor(Lambdag, nInternalFaces);
+                    if constexpr(std::is_same<DType, Type>::value)
+                    {
+                        foamAtomic::AtomicAdd
+                        (
+                            gPtr[uPtr[facei]],
+                            cmptMultiply(-omega * rDPtr[uPtr[facei]], lowerPtr[facei] * gOldPtr[lPtr[facei]])
+                        );
+                    }
+                    else
+                    {
+                        foamAtomic::AtomicAdd
+                        (
+                            gPtr[uPtr[facei]],
+                           -omega * rDPtr[uPtr[facei]] * lowerPtr[facei] * gOldPtr[lPtr[facei]]
+                        );
+                    }
+                };
+                exec.parallelFor(Lambdag, nInternalFaces);
+            }
         }
 
         // --- Update solution vector
