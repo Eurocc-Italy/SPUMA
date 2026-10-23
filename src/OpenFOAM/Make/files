@@ -424,6 +424,16 @@ $(LUscalarMatrix)/LUscalarMatrix.C
 $(LUscalarMatrix)/procLduMatrix.C
 $(LUscalarMatrix)/procLduInterface.C
 
+SparseMatrix = matrices/SparseMatrix
+$(SparseMatrix)/SparseMatrix.C
+
+SELLMatrix = matrices/SELLMatrix
+$(SELLMatrix)/SELLMatrix/SELLMatrix.C
+$(SELLMatrix)/SELLMatrix/SELLMatrixATmul.C
+
+SELLAddressing = $(SELLMatrix)/SELLAddressing
+$(SELLAddressing)/SELLAddressing.C
+
 lduMatrix = matrices/lduMatrix
 $(lduMatrix)/lduMatrix/lduMatrix.C
 $(lduMatrix)/lduMatrix/lduMatrixOperations.C

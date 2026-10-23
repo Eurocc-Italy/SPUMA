@@ -119,12 +119,12 @@ Foam::ChebyshevSmoother::ChebyshevSmoother
     else if (subPreconditionerName_ == l1diagonalPreconditioner::typeName)
     {
         preconditioner_ = autoPtr<l1diagonalPreconditioner>::New
-            (
-                matrix,
-                interfaceBouCoeffs,
-                interfaces,
-                solverControls
-            );
+        (
+            matrix,
+            interfaceBouCoeffs,
+            interfaces,
+            solverControls
+        );
         // select spectral radius estimator
         spRadiusEstimator_ = autoPtr<fixedValue>::New(1.0);
     }
@@ -142,15 +142,15 @@ void Foam::ChebyshevSmoother::readControls()
 {
     pDegree_ = controlDict_.getOrDefault<label>("pDegree", 1);
     normalization_ = controlDict_.getOrDefault<word>
-                     (
-                        "normalization",
-                        "optimalVCycle"
-                     );
+    (
+        "normalization",
+        "optimalVCycle"
+    );
     subPreconditionerName_ = controlDict_.getOrDefault<word>
-                             (
-                                "subPreconditioner",
-                                l1diagonalPreconditioner::typeName
-                             );
+    (
+        "subPreconditioner",
+        l1diagonalPreconditioner::typeName
+    );
     log_ = controlDict_.getOrDefault<label>("log", 0);
 }
 
@@ -203,11 +203,18 @@ void Foam::ChebyshevSmoother::smooth_
 
     foamExecutor exec;
 
-    scalar rho0 = (lambdaMax - lambdaMin) / (lambdaMax + lambdaMin);
+    const scalar rho0 = (lambdaMax - lambdaMin) / (lambdaMax + lambdaMin);
     const scalar alpha1 = 2 * rho0 / ((lambdaMax - lambdaMin) * spRadius);
 
     // --- Calculate A.psi
-    matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    if (cmatrix_)
+    {
+        (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+    }
+    else
+    {
+        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    }
 
     preconditioner_->precondition(wA,source - Apsi);
 
@@ -234,24 +241,31 @@ void Foam::ChebyshevSmoother::smooth_
         exec.parallelFor(LambdapDeg1, nCells);
     }
 
-    scalar rhok = 2.* (lambdaMax + lambdaMin) / (lambdaMax - lambdaMin);
+    const scalar rhok = 2.* (lambdaMax + lambdaMin) / (lambdaMax - lambdaMin);
     scalar rhonminus1 = rho0;
 
     // Remaining iterations up to the maximum degree of the Chebyshev polynomial
     for (label p=1; p<pDegree_; ++p)
     {
-        scalar rhon = 1. / (rhok - rhonminus1);
-        scalar alpha0n = rhon * rhonminus1;
-        scalar alpha1n = 4.* rhon / ((lambdaMax - lambdaMin) * spRadius);
+        const scalar rhon = 1. / (rhok - rhonminus1);
+        const scalar alpha0n = rhon * rhonminus1;
+        const scalar alpha1n = 4.* rhon / ((lambdaMax - lambdaMin) * spRadius);
 
         // --- Calculate A.psi
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        if (cmatrix_)
+        {
+            (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
+        else
+        {
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        }
         
         preconditioner_->precondition(wA, source - Apsi);
 
         // p-th iteration of the Chebyshev method 
         auto LambdapDegN = [=](label celli)
-	    {
+        {
             const scalar tmp = psiPtr[celli];
 
             psiPtr[celli] += alpha0n * (psiPtr[celli] - psiOldPtr[celli])
@@ -261,7 +275,7 @@ void Foam::ChebyshevSmoother::smooth_
         };
         exec.parallelFor(LambdapDegN, nCells);
 
-    	rhonminus1 = rhon;
+        rhonminus1 = rhon;
     }
 }
 

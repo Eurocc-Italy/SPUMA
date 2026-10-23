@@ -54,7 +54,14 @@ Foam::solverPerformance Foam::GAMGSolver::solve
 
     // Calculate A.psi used to calculate the initial residual
     solveScalarField Apsi(psi.size());
-    matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    if (cmatrix_)
+    {
+        (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+    }
+    else
+    {
+        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    }
 
     // Create the storage for the finestCorrection which may be used as a
     // temporary in normFactor
@@ -139,15 +146,30 @@ Foam::solverPerformance Foam::GAMGSolver::solve
             );
 
             // Calculate finest level residual field
-            matrix_.residual
-            (
-                finestResidual, 
-                psi,
-                tsource(),
-                interfaceBouCoeffs_,
-                interfaces_,
-                cmpt
-            );
+            if (cmatrix_)
+            {
+                (*cmatrix_).residual
+                (
+                    finestResidual,
+                    psi,
+                    tsource(),
+                    interfaceBouCoeffs_,
+                    interfaces_,
+                    cmpt
+                );
+            }
+            else
+            {
+                matrix_.residual
+                (
+                    finestResidual,
+                    psi,
+                    tsource(),
+                    interfaceBouCoeffs_,
+                    interfaces_,
+                    cmpt
+                );
+            }
 
             solverPerf.finalResidual() = gSumMag
             (
@@ -507,6 +529,11 @@ void Foam::GAMGSolver::initVcycle
         )
     );
 
+    if (cmatrix_)
+    {
+        smoothers[0].setCMatrix(cmatrix_.get());
+    }
+
     forAll(matrixLevels_, leveli)
     {
         if (agglomeration_.nCells(leveli) >= 0)
@@ -539,6 +566,11 @@ void Foam::GAMGSolver::initVcycle
                     controlDict_
                 )
             );
+
+            if (cmatrix_)
+            {
+                smoothers[leveli + 1].setCMatrix(cmatrix_.get());
+            }
         }
     }
 

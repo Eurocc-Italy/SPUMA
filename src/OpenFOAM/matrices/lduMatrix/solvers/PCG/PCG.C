@@ -29,6 +29,7 @@ License
 
 #include "PCG.H"
 #include "PrecisionAdaptor.H"
+#include "SELLMatrix.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -84,6 +85,7 @@ Foam::solverPerformance Foam::PCG::scalarSolve
     const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
 
     label nCells = psi.size();
+    label nInternalFaces = matrix().lduAddr().upperAddr().size();
 
     solveScalar* __restrict__ psiPtr = psi.begin();
 
@@ -99,7 +101,14 @@ Foam::solverPerformance Foam::PCG::scalarSolve
     foamExecutor exec;
 
     // --- Calculate A.psi
-    matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    if (cmatrix_)
+    {
+        (*cmatrix_).Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+    }
+    else
+    {
+        matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    }
 
     // --- Calculate initial residual field
     solveScalarField rA(source - wA);
@@ -175,7 +184,14 @@ Foam::solverPerformance Foam::PCG::scalarSolve
             }
 
             // --- Update preconditioned residual
-            matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            if (cmatrix_)
+            {
+                (*cmatrix_).Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
+            else
+            {
+                matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            }
 
             solveScalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
 

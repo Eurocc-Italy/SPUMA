@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2016-2023 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -29,6 +30,7 @@ License
 #include "lduMatrix.H"
 #include "diagonalSolver.H"
 #include "PrecisionAdaptor.H"
+#include "SELLMatrix.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -170,6 +172,7 @@ Foam::lduMatrix::solver::solver
 :
     fieldName_(fieldName),
     matrix_(matrix),
+    cmatrix_(nullptr),
     interfaceBouCoeffs_(interfaceBouCoeffs),
     interfaceIntCoeffs_(interfaceIntCoeffs),
     interfaces_(interfaces),
@@ -181,10 +184,13 @@ Foam::lduMatrix::solver::solver
     normType_(lduMatrix::normTypes::DEFAULT_NORM),
     tolerance_(lduMatrix::defaultTolerance),
     relTol_(Zero),
+    matrixFormatType_(SparseMatrix::matrixFormatTypes::DEFAULT_MATRIX_FORMAT),
 
     profiling_("lduMatrix::solver." + fieldName)
 {
     readControls();
+
+    convert();
 }
 
 
@@ -198,6 +204,7 @@ void Foam::lduMatrix::solver::readControls()
     normType_ = lduMatrix::normTypes::DEFAULT_NORM;
     tolerance_ = lduMatrix::defaultTolerance;
     relTol_ = 0;
+    matrixFormatType_ = SparseMatrix::matrixFormatTypes::DEFAULT_MATRIX_FORMAT;
 
     controlDict_.readIfPresent("log", log_);
     lduMatrix::normTypesNames_.readIfPresent("norm", controlDict_, normType_);
@@ -205,6 +212,12 @@ void Foam::lduMatrix::solver::readControls()
     controlDict_.readIfPresent("maxIter", maxIter_);
     controlDict_.readIfPresent("tolerance", tolerance_);
     controlDict_.readIfPresent("relTol", relTol_);
+    SparseMatrix::matrixFormatTypesNames_.readIfPresent
+    (
+        "matrixFormat",
+        controlDict_,
+        matrixFormatType_
+    );
 }
 
 
@@ -271,6 +284,25 @@ Foam::solveScalarField::cmptType Foam::lduMatrix::solver::normFactor
 
     // Fall-through: no norm
     return solveScalarField::cmptType(1);
+}
+
+
+void Foam::lduMatrix::solver::convert()
+{
+    switch (matrixFormatType_)
+    {
+        case SparseMatrix::matrixFormatTypes::DEFAULT_MATRIX_FORMAT:
+        {
+            cmatrix_ = nullptr;
+            break;
+        }
+
+        case SparseMatrix::matrixFormatTypes::SELL_MATRIX_FORMAT:
+        {
+            cmatrix_ = std::make_unique<SELLMatrix>(matrix_);
+            break;
+        }
+    }
 }
 
 

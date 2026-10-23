@@ -86,7 +86,7 @@ void Foam::LduMatrix<Type, DType, LUType>::Amul
 
         auto LambdaAmul = [=](label cell)
         {
-            auto val;
+            Type val;
 
             if constexpr(std::is_same<DType, Type>::value)
             {
@@ -276,7 +276,7 @@ void Foam::LduMatrix<Type, DType, LUType>::sumA
 
         auto LambdaAmul = [=](label cell)
         {
-            auto val;
+            Type val;
 
             if constexpr(std::is_same<DType, Type>::value)
             {
@@ -416,7 +416,7 @@ void Foam::LduMatrix<Type, DType, LUType>::residual
 
         auto LambdaAmul = [=](label cell)
         {
-            auto val;
+            Type val;
 
             if constexpr(std::is_same<DType, Type>::value)
             {

@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017,2022 OpenFOAM Foundation
     Copyright (C) 2016-2024 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -74,6 +75,7 @@ namespace Foam
 // Forward Declarations
 class fvMeshLduAddressing;
 class fvMeshCsrAddressing;
+class fvMeshSELLAddressing;
 class volMesh;
 template<class Type> class fvMatrix;
 
@@ -102,6 +104,8 @@ protected:
         mutable std::unique_ptr<fvMeshLduAddressing> lduPtr_;
 
         mutable std::unique_ptr<fvMeshCsrAddressing> csrPtr_;
+
+	mutable std::unique_ptr<fvMeshSELLAddressing> SELLPtr_;
 
         //- Current time index for cell volumes
         //  Note.  The whole mechanism will be replaced once the
@@ -327,6 +331,9 @@ public:
 
             //- Return ldu addressing
             virtual const lduAddressing& lduAddr() const;
+
+            //- Return SELL addressing
+            virtual const SELLAddressing& SELLAddr() const;
 
             //- Return CSR addressing
             const fvMeshCsrAddressing& csrAddr() const;

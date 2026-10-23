@@ -170,6 +170,7 @@ Foam::lduMatrix::smoother::smoother
 :
     fieldName_(fieldName),
     matrix_(matrix),
+    cmatrix_(nullptr),
     interfaceBouCoeffs_(interfaceBouCoeffs),
     interfaceIntCoeffs_(interfaceIntCoeffs),
     interfaces_(interfaces),

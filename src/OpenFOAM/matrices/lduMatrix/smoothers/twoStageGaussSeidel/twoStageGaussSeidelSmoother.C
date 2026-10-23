@@ -149,7 +149,14 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
         // -- Compute new residual vector (scaled by D^-1)
 
         // --- Calculate A.psi (we use rDr as auxiliary field)
-        matrix_.Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        if (cmatrix_)
+        {
+            (*cmatrix_).Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
+        else
+        {
+            matrix_.Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        }
 
         // --- Calculate rDr = D^-1 * rA
         // --- Initialize g with rDr

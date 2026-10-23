@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2016 OpenFOAM Foundation
     Copyright (C) 2016-2019 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -53,7 +54,8 @@ namespace Foam
 class lduPrimitiveMesh
 :
     public lduMesh,
-    public lduAddressing
+    public lduAddressing,
+    public SELLAddressing
 {
     // Private Data
 
@@ -206,6 +208,18 @@ public:
 
             //- Return non-const ldu addressing
             virtual lduAddressing& lduAddr()
+            {
+                return *this;
+            }
+
+            //- Return SELL addressing
+            virtual const SELLAddressing& SELLAddr() const
+            {
+                return *this;
+            }
+
+            //- Return non-const SELL addressing
+            virtual SELLAddressing& SELLAddr()
             {
                 return *this;
             }

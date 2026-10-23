@@ -2,6 +2,7 @@ fvMesh/fvMeshGeometry.C
 fvMesh/fvMesh.C
 fvMesh/fvMeshLduAddressing.C
 fvMesh/fvMeshCsrAddressing.C
+fvMesh/fvMeshSELLAddressing.C
 
 fvGeometryScheme = fvMesh/fvGeometryScheme
 $(fvGeometryScheme)/fvGeometryScheme/fvGeometryScheme.C

@@ -54,6 +54,7 @@ SourceFiles
 #ifndef Foam_lduMatrix_H
 #define Foam_lduMatrix_H
 
+#include "SparseMatrix.H"
 #include "lduMesh.H"
 #include "primitiveFieldsFwd.H"
 #include "FieldField.H"
@@ -145,6 +146,9 @@ public:
             const FieldField<Field, scalar>& interfaceIntCoeffs_;
             lduInterfaceFieldPtrsList interfaces_;
 
+            //- Converted matrix (if requested)
+            std::unique_ptr<SparseMatrix> cmatrix_;
+
             //- Dictionary of solution controls
             dictionary controlDict_;
 
@@ -159,6 +163,9 @@ public:
 
             //- The normalisation type
             lduMatrix::normTypes normType_;
+
+            //- The matrix format type to be used in the SpMVM kernel
+            SparseMatrix::matrixFormatTypes matrixFormatType_;
 
             //- Final convergence tolerance
             scalar tolerance_;
@@ -345,6 +352,10 @@ public:
             {
                 return this->normFactor(psi, source, Apsi, tmpField, normType_);
             }
+
+            //- Convert the matrix using a user-defined format
+            // for the SpMVM kernel
+            void convert();
     };
 
 
@@ -361,7 +372,10 @@ public:
             const FieldField<Field, scalar>& interfaceBouCoeffs_;
             const FieldField<Field, scalar>& interfaceIntCoeffs_;
             const lduInterfaceFieldPtrsList& interfaces_;
-            
+
+            //- Converted matrix (if requested)
+            SparseMatrix* cmatrix_;
+
             //- Dictionary of solution controls
             dictionary controlDict_;
 
@@ -482,6 +496,10 @@ public:
                 return interfaces_;
             }
 
+            void setCMatrix(SparseMatrix* matrix) noexcept
+            {
+                cmatrix_ = matrix;
+            }
 
             //- Smooth the solution for a given number of sweeps
             virtual void smooth

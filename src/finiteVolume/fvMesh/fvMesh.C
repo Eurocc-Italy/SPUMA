@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017,2022 OpenFOAM Foundation
     Copyright (C) 2016-2024 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -34,6 +35,7 @@ License
 #include "SubField.H"
 #include "fvMeshLduAddressing.H"
 #include "fvMeshCsrAddressing.H"
+#include "fvMeshSELLAddressing.H"
 #include "mapPolyMesh.H"
 #include "MapFvFields.H"
 #include "fvMeshMapper.H"
@@ -160,6 +162,7 @@ void Foam::fvMesh::clearAddressing(const bool isMeshUpdate)
 
     lduPtr_.reset(nullptr);
     csrPtr_.reset(nullptr);
+    SELLPtr_.reset(nullptr);
 }
 
 
@@ -730,6 +733,23 @@ const Foam::lduAddressing& Foam::fvMesh::lduAddr() const
 }
 
 
+const Foam::SELLAddressing& Foam::fvMesh::SELLAddr() const
+{
+    if (!SELLPtr_)
+    {
+        DebugInFunction
+            << "Calculating fvMeshSELLAddressing from nFaces:"
+            << nFaces() << endl;
+
+        SELLPtr_ = std::make_unique<fvMeshSELLAddressing>(*this);
+
+        return *SELLPtr_;
+    }
+
+    return *SELLPtr_;
+}
+
+
 const Foam::fvMeshCsrAddressing& Foam::fvMesh::csrAddr() const
 {
     if (!csrPtr_)
@@ -993,7 +1013,7 @@ void Foam::fvMesh::updateMesh(const mapPolyMesh& mpm)
     // Our slice of the addressing is no longer valid
     lduPtr_.reset(nullptr);
     csrPtr_.reset(nullptr);
-
+    SELLPtr_.reset(nullptr);
 
     if (VPtr_)
     {

@@ -41,6 +41,7 @@ License
 #include "wedgeFaPatch.H"
 #include "faPatchData.H"
 #include "registerSwitch.H"
+#include "SELLAddressing.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -393,6 +394,7 @@ void Foam::faMesh::clearAddressing() const
     DebugInFunction << "Clearing addressing" << endl;
 
     lduPtr_.reset(nullptr);
+    SELLPtr_.reset(nullptr);
 }
 
 
@@ -1281,6 +1283,17 @@ const Foam::lduAddressing& Foam::faMesh::lduAddr() const
     }
 
     return *lduPtr_;
+}
+
+
+const Foam::SELLAddressing& Foam::faMesh::SELLAddr() const
+{
+    if (!SELLPtr_)
+    {
+        NotImplemented;
+    }
+
+    return *SELLPtr_;
 }
 
 

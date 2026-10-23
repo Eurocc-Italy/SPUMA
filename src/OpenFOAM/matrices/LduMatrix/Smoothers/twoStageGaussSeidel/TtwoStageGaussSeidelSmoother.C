@@ -154,7 +154,7 @@ void Foam::TtwoStageGaussSeidelSmoother<Type, DType, LUType>::smooth
             }
 
             // --- Multiply g by the matrix omega * D^-1 * L
-            if (hasLowerCSR())
+            if (matrix_.hasLowerCSR())
             {
                 const label* const __restrict__ loStartPtr =
                     addr.losortStartAddr().begin();

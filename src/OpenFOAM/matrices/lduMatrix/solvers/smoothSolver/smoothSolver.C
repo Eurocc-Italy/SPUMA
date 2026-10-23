@@ -109,6 +109,11 @@ Foam::solverPerformance Foam::smoothSolver::solve
             controlDict_
         );
 
+        if (cmatrix_)
+        {
+            smootherPtr->setCMatrix(cmatrix_.get());
+        }
+
         smootherPtr->smooth
         (
             psi,
@@ -131,7 +136,14 @@ Foam::solverPerformance Foam::smoothSolver::solve
             solveScalarField temp(psi.size());
 
             // Calculate A.psi
-            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            if (cmatrix_)
+            {
+                (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
+            else
+            {
+                matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            }
 
             // Calculate normalisation factor
             normFactor = this->normFactor(psi, tsource(), Apsi, temp);
@@ -177,6 +189,11 @@ Foam::solverPerformance Foam::smoothSolver::solve
                 controlDict_
             );
 
+            if (cmatrix_)
+            {
+                smootherPtr->setCMatrix(cmatrix_.get());
+            }
+
             // Smoothing loop
             do
             {
@@ -188,15 +205,30 @@ Foam::solverPerformance Foam::smoothSolver::solve
                     nSweeps_
                 );
 
-                residual =
-                    matrix_.residual
+                if (cmatrix_)
+                {
+                    (*cmatrix_).residual
                     (
+                        residual,
                         psi,
                         source,
                         interfaceBouCoeffs_,
                         interfaces_,
                         cmpt
                     );
+                }
+                else
+                {
+                    matrix_.residual
+                    (
+                        residual,
+                        psi,
+                        source,
+                        interfaceBouCoeffs_,
+                        interfaces_,
+                        cmpt
+                    );
+                }
 
                 // Calculate the residual to check convergence
                 solverPerf.finalResidual() =

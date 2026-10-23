@@ -84,6 +84,7 @@ class faMeshBoundaryHalo;
 class faMeshLduAddressing;
 class faMeshMapper;
 class faPatchData;
+class SELLAddressing;
 
 /*---------------------------------------------------------------------------*\
                        Class faMeshRegistry Declaration
@@ -297,6 +298,9 @@ class faMesh
 
         //- Ldu addressing data
         mutable std::unique_ptr<faMeshLduAddressing> lduPtr_;
+
+        //- SELL addressing data
+        mutable std::unique_ptr<SELLAddressing> SELLPtr_;
 
 
     // Geometric Data
@@ -952,6 +956,9 @@ public:
 
             //- Return ldu addressing
             virtual const lduAddressing& lduAddr() const;
+
+	    //- Return SELL addressing
+            virtual const SELLAddressing& SELLAddr() const;
 
             //- Return a list of pointers for each patch
             //  with only those pointing to interfaces being set

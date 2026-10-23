@@ -37,6 +37,7 @@ Description
 #define Foam_lduMesh_H
 
 #include "lduAddressing.H"
+#include "SELLAddressing.H"
 #include "lduInterfacePtrsList.H"
 #include "typeInfo.H"
 #include "InfoProxy.H"
@@ -81,6 +82,9 @@ public:
 
             //- Return ldu addressing
             virtual const lduAddressing& lduAddr() const = 0;
+
+            //- Return SELL addressing
+            virtual const SELLAddressing& SELLAddr() const = 0;
 
             //- Return a list of pointers for each patch
             //- with only those pointing to interfaces being set
