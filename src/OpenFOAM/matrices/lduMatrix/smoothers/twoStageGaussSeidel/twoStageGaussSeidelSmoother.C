@@ -107,6 +107,8 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
     const label nSweeps
 ) const
 {
+    const auto& addr = matrix_.lduAddr();
+
     solveScalar* __restrict__ psiPtr = psi.begin();
     const solveScalar* const __restrict__ bPtr = source.cbegin();
 
@@ -123,9 +125,9 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
         matrix_.lower().begin();
 
     const label* const __restrict__ uPtr =
-        matrix_.lduAddr().upperAddr().begin();
+        addr.upperAddr().begin();
     const label* const __restrict__ lPtr =
-        matrix_.lduAddr().lowerAddr().begin();
+        addr.lowerAddr().begin();
 
     solveScalarField rDr(nCells);
     solveScalar* __restrict__ rDrPtr = rDr.begin();
@@ -153,29 +155,63 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
         // --- Initialize g with rDr
         auto LambdarDr = [=](label celli)
         {
-            rDrPtr[celli] = rDPtr[celli] * (bPtr[celli] - rDrPtr[celli]);
-            gPtr[celli] = rDrPtr[celli];
+            const solveScalar rDr = rDPtr[celli] * (bPtr[celli] - rDrPtr[celli]);
+            rDrPtr[celli] = rDr;
+            gPtr[celli] = rDr;
+            gOldPtr[celli] = rDr;
         };
         exec.parallelFor(LambdarDr, nCells);
 
         // --- Perform local inner (nInnerIter) Jacobi iterations
         for (label j=0; j<this->nInnerIter_; ++j)
         {
-            gOld = g;
-
             if (j != 0)
-                g = rDr;
-
-            // --- Multiply g by the matrix omega * D^-1 * L
-            auto Lambdag = [=](label facei)
             {
-                foamAtomic::AtomicAdd
-                (
-                    gPtr[uPtr[facei]],
-                   -omega * rDPtr[uPtr[facei]] * lowerPtr[facei] * gOldPtr[lPtr[facei]]
-                );
-            };
-            exec.parallelFor(Lambdag, nInternalFaces);
+                gOld = g;
+                g = rDr;
+            }
+
+            // --- Multiply g by the matrix -omega * D^-1 * L
+            if (useLowerCSR)
+            {
+                const label* const __restrict__ loStartPtr =
+                    addr.losortStartAddr().begin();
+                const label* const __restrict__ lcsrPtr =
+                    addr.lowerCSRAddr().begin();
+                const scalar* const __restrict__ lowercsrPtr =
+                    matrix_.lowerCSR().begin();
+
+                auto Lambdag = [=](label celli)
+                {
+                    const label start = loStartPtr[celli];
+                    const label end = loStartPtr[celli + 1];
+
+                    solveScalar val = 0.;
+
+                    for (label i = start; i < end; i++)
+                    {
+                        const label nbrCell = lcsrPtr[i];
+                        val += lowercsrPtr[i] * gOldPtr[nbrCell];
+                    }
+
+                    val *= -omega * rDPtr[celli];
+                    gPtr[celli] += val;
+                };
+                exec.parallelFor(Lambdag, nCells);
+            }
+            else
+            {
+                // --- Multiply g by the matrix omega * D^-1 * L
+                auto Lambdag = [=](label facei)
+                {
+                    foamAtomic::AtomicAdd
+                    (
+                        gPtr[uPtr[facei]],
+                       -omega * rDPtr[uPtr[facei]] * lowerPtr[facei] * gOldPtr[lPtr[facei]]
+                    );
+                };
+                exec.parallelFor(Lambdag, nInternalFaces);
+            }
         }
 
         // --- Update solution vector
