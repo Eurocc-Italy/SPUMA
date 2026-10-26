@@ -109,6 +109,8 @@ class lduMatrix
         //- Work space
         mutable std::unique_ptr<solveScalarField> workPtr_;
 
+        //- Store the lower matrix in CSR format 
+        bool useLowerCSR_;
 
 public:
 
@@ -719,6 +721,16 @@ public:
 
         bool hasLowerCSR() const noexcept { return bool(lowerCSRPtr_); }
 
+        bool useLowerCSR() const noexcept
+        {
+            return useLowerCSR_;
+        }
+
+        void setUseLowerCSR(bool useLowerCSR) noexcept
+        {
+            useLowerCSR_ = useLowerCSR;
+        }
+
         const scalarField& lowerCSR() const;
 
         scalarField& lowerCSR();
@@ -772,8 +784,7 @@ public:
                 const tmp<solveScalarField>&,
                 const FieldField<Field, scalar>&,
                 const lduInterfaceFieldPtrsList&,
-                const direction cmpt,
-                const bool useLowerCSR=false
+                const direction cmpt
             ) const;
 
             //- Matrix transpose multiplication with updated interfaces.

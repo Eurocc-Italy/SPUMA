@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2023-2024 OpenCFD Ltd.
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -56,7 +56,7 @@ void Foam::GAMGSolver::agglomerateMatrix
             new lduMatrix(coarseMesh)
         );
         lduMatrix& coarseMatrix = matrixLevels_[fineLevelIndex];
-
+        coarseMatrix.setUseLowerCSR(fineMatrix.useLowerCSR());
 
         // Coarse matrix diagonal initialised by restricting the finer mesh
         // diagonal. Note that we size with the cached coarse nCells and not

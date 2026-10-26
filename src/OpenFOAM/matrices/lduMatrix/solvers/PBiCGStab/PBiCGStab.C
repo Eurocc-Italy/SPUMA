@@ -84,8 +84,6 @@ Foam::solverPerformance Foam::PBiCGStab::scalarSolve
         fieldName_
     );
 
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     const label nCells = psi.size();
 
     solveScalar* __restrict__ psiPtr = psi.begin();
@@ -99,7 +97,7 @@ Foam::solverPerformance Foam::PBiCGStab::scalarSolve
     foamExecutor exec;
 
     // --- Calculate A.psi
-    matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+    matrix_.Amul(yA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
 
     // --- Calculate initial residual field
     solveScalarField rA(source - yA);
@@ -199,7 +197,7 @@ Foam::solverPerformance Foam::PBiCGStab::scalarSolve
                 auto Lamda2 = [=](label cell)
                 {
                     pAPtr[cell] =
-		        rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
+                    rAPtr[cell] + beta*(pAPtr[cell] - omega*AyAPtr[cell]);
                 };
                 exec.parallelFor(Lamda2, nCells);
             }
@@ -208,7 +206,7 @@ Foam::solverPerformance Foam::PBiCGStab::scalarSolve
             preconPtr_->precondition(yA, pA, cmpt);
 
             // --- Calculate AyA
-            matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            matrix_.Amul(AyA, yA, interfaceBouCoeffs_, interfaces_, cmpt);
 
             const solveScalar rA0AyA =
                 gSumProd(rA0, AyA, matrix().mesh().comm());
@@ -232,7 +230,7 @@ Foam::solverPerformance Foam::PBiCGStab::scalarSolve
              && solverPerf.checkConvergence(tolerance_, relTol_, log_)
             )
             {
-		auto Lamda4 = [=](label cell)
+                auto Lamda4 = [=](label cell)
                 {
                     psiPtr[cell] += alpha*yAPtr[cell];
                 };
@@ -247,7 +245,7 @@ Foam::solverPerformance Foam::PBiCGStab::scalarSolve
             preconPtr_->precondition(zA, sA, cmpt);
 
             // --- Calculate tA
-            matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            matrix_.Amul(tA, zA, interfaceBouCoeffs_, interfaces_, cmpt);
 
             const solveScalar tAtA = gSumSqr(tA, matrix().mesh().comm());
 

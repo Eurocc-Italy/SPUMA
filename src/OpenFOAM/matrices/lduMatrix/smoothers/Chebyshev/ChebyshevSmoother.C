@@ -166,8 +166,6 @@ void Foam::ChebyshevSmoother::smooth_
     const label nSweeps
 )  const
 {
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     const label nCells = psi.size();
 
     solveScalar* __restrict__ psiPtr = psi.begin();
@@ -213,7 +211,7 @@ void Foam::ChebyshevSmoother::smooth_
     }
     else
     {
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
     }
 
     preconditioner_->precondition(wA,source - Apsi);
@@ -258,7 +256,7 @@ void Foam::ChebyshevSmoother::smooth_
         }
         else
         {
-            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
         }
         
         preconditioner_->precondition(wA, source - Apsi);

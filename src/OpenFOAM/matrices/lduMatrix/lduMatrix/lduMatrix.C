@@ -61,13 +61,15 @@ Foam::lduMatrix::normTypesNames_
 
 Foam::lduMatrix::lduMatrix(const lduMesh& mesh)
 :
-    lduMesh_(mesh)
+    lduMesh_(mesh),
+    useLowerCSR_(false)
 {}
 
 
 Foam::lduMatrix::lduMatrix(const lduMatrix& A)
 :
-    lduMesh_(A.lduMesh_)
+    lduMesh_(A.lduMesh_),
+    useLowerCSR_(A.useLowerCSR_)
 {
     if (A.diagPtr_)
     {
@@ -100,13 +102,15 @@ Foam::lduMatrix::lduMatrix(lduMatrix&& A)
     lowerPtr_(std::move(A.lowerPtr_)),
     upperPtr_(std::move(A.upperPtr_)),
     lowerCSRPtr_(std::move(A.lowerCSRPtr_)),
-    workPtr_(std::move(A.workPtr_))
+    workPtr_(std::move(A.workPtr_)),
+    useLowerCSR_(A.useLowerCSR_)
 {}
 
 
 Foam::lduMatrix::lduMatrix(lduMatrix& A, bool reuse)
 :
-    lduMesh_(A.lduMesh_)
+    lduMesh_(A.lduMesh_),
+    useLowerCSR_(A.useLowerCSR_)
 {
     if (reuse)
     {
@@ -146,7 +150,8 @@ Foam::lduMatrix::lduMatrix(lduMatrix& A, bool reuse)
 
 Foam::lduMatrix::lduMatrix(const lduMesh& mesh, Istream& is)
 :
-    lduMesh_(mesh)
+    lduMesh_(mesh),
+    useLowerCSR_(false)
 {
     bool withLower, withDiag, withUpper, withLowerCSR;
 

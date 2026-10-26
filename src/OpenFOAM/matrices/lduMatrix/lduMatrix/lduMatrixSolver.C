@@ -205,6 +205,7 @@ void Foam::lduMatrix::solver::readControls()
     tolerance_ = lduMatrix::defaultTolerance;
     relTol_ = 0;
     matrixFormatType_ = SparseMatrix::matrixFormatTypes::DEFAULT_MATRIX_FORMAT;
+    bool useLowerCSR = false;
 
     controlDict_.readIfPresent("log", log_);
     lduMatrix::normTypesNames_.readIfPresent("norm", controlDict_, normType_);
@@ -212,6 +213,8 @@ void Foam::lduMatrix::solver::readControls()
     controlDict_.readIfPresent("maxIter", maxIter_);
     controlDict_.readIfPresent("tolerance", tolerance_);
     controlDict_.readIfPresent("relTol", relTol_);
+    controlDict_.readIfPresent("useLowerCSR", useLowerCSR);
+    const_cast<lduMatrix&>(matrix_).setUseLowerCSR(useLowerCSR);
     SparseMatrix::matrixFormatTypesNames_.readIfPresent
     (
         "matrixFormat",

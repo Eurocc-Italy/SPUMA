@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2013 OpenFOAM Foundation
     Copyright (C) 2019-2020 OpenCFD Ltd.
+    Copyright (C) 2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -83,8 +84,6 @@ void Foam::GAMGPreconditioner::precondition
     const direction cmpt
 ) const
 {
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     wA = Zero;
     solveScalarField AwA(wA.size());
     solveScalarField finestCorrection(wA.size());
@@ -144,7 +143,7 @@ void Foam::GAMGPreconditioner::precondition
         if (cycle < nVcycles_-1)
         {
             // Calculate finest level residual field
-            matrix_.Amul(AwA, wA, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            matrix_.Amul(AwA, wA, interfaceBouCoeffs_, interfaces_, cmpt);
             finestResidual = rA_ss;
             finestResidual -= AwA;
         }

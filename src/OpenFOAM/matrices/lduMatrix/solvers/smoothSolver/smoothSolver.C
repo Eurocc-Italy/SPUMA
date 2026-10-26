@@ -92,8 +92,6 @@ Foam::solverPerformance Foam::smoothSolver::solve
     // Setup class containing solver performance data
     solverPerformance solverPerf(typeName, fieldName_);
 
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false); 
-
     // If the nSweeps_ is negative do a fixed number of sweeps
     if (nSweeps_ < 0)
     {
@@ -142,7 +140,7 @@ Foam::solverPerformance Foam::smoothSolver::solve
             }
             else
             {
-                matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+                matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
             }
 
             // Calculate normalisation factor

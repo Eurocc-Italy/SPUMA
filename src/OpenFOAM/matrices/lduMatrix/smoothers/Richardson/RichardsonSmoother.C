@@ -115,8 +115,6 @@ void Foam::RichardsonSmoother::smooth_
     const label nSweeps
 ) const
 {
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     const label nCells = psi.size();
 
     solveScalarField Apsi(nCells);
@@ -124,7 +122,7 @@ void Foam::RichardsonSmoother::smooth_
     for (label sweep=0; sweep<nSweeps; sweep++)
     {
         // --- Calculate A.psi
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
 
         preconditioner_().precondition(Apsi, source - Apsi);
 

@@ -41,8 +41,7 @@ void Foam::lduMatrix::Amul
     const tmp<solveScalarField>& tpsi,
     const FieldField<Field, scalar>& interfaceBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaces,
-    const direction cmpt,
-    const bool useLowerCSR
+    const direction cmpt
 ) const
 {
     const auto& addr = lduAddr();
@@ -78,10 +77,10 @@ void Foam::lduMatrix::Amul
 
     const label nCells = diag().size();
 
-    if (useLowerCSR)
+    if (useLowerCSR())
     {
         // Use cell-based looping
-        if (debug == 2) PoutInFunction<< "cell-based looping" << endl;
+        if (debug == 2) PoutInFunction<< "Amul: cell-based looping" << endl;
 
         const label* const __restrict__ oStartPtr =
             addr.ownerStartAddr().begin();
@@ -128,7 +127,7 @@ void Foam::lduMatrix::Amul
     }
     else
     {
-        if (debug == 2) PoutInFunction<< "ldu-based looping" << endl;
+        if (debug == 2) PoutInFunction<< "Amul: ldu-based looping" << endl;
 
         const label nFaces = upper().size();
         auto LambdaDiag = [=](label cell)
@@ -253,12 +252,10 @@ void Foam::lduMatrix::sumA
 
     foamExecutor exec;
 
-    const bool useLowerCSR = false;
-
-    if (useLowerCSR)
+    if (useLowerCSR())
     {
         // Use cell-based looping
-        if (debug == 2) PoutInFunction<< "cell-based looping" << endl;
+        if (debug == 2) PoutInFunction<< "sumA: cell-based looping" << endl;
 
         const label* const __restrict__ oStartPtr =
             addr.ownerStartAddr().begin();
@@ -303,7 +300,7 @@ void Foam::lduMatrix::sumA
     }
     else
     {
-        if (debug == 2) PoutInFunction<< "ldu-based looping" << endl;
+        if (debug == 2) PoutInFunction<< "sumA: ldu-based looping" << endl;
 
         auto LambdaDiag = [=](label cell)
         {
@@ -392,12 +389,10 @@ void Foam::lduMatrix::residual
 
     const label nCells = diag().size();
 
-    const bool useLowerCSR = false;
-
-    if (useLowerCSR)
+    if (useLowerCSR())
     {
         // Use cell-based looping
-        if (debug == 2) PoutInFunction<< "cell-based looping" << endl;
+        if (debug == 2) PoutInFunction<< "residual: cell-based looping" << endl;
 
         const label* const __restrict__ oStartPtr =
             addr.ownerStartAddr().begin();
@@ -443,7 +438,7 @@ void Foam::lduMatrix::residual
     }
     else
     {
-        if (debug == 2) PoutInFunction<< "ldu-based looping" << endl;
+        if (debug == 2) PoutInFunction<< "residual: ldu-based looping" << endl;
 
         auto LambdaDiag = [=](label cell)
         {

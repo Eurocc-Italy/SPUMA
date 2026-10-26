@@ -112,8 +112,6 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
     solveScalar* __restrict__ psiPtr = psi.begin();
     const solveScalar* const __restrict__ bPtr = source.cbegin();
 
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     const label nCells = psi.size();
     const label nInternalFaces = matrix_.upper().size();
 
@@ -155,7 +153,7 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
         }
         else
         {
-            matrix_.Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+            matrix_.Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt);
         }
 
         // --- Calculate rDr = D^-1 * rA
@@ -179,7 +177,7 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
             }
 
             // --- Multiply g by the matrix -omega * D^-1 * L
-            if (useLowerCSR)
+            if (matrix_.useLowerCSR())
             {
                 const label* const __restrict__ loStartPtr =
                     addr.losortStartAddr().begin();

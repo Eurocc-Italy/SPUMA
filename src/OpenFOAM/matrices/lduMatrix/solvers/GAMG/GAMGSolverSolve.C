@@ -47,8 +47,6 @@ Foam::solverPerformance Foam::GAMGSolver::solve
 
     ConstPrecisionAdaptor<solveScalar, scalar> tsource(source);
 
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     // Setup class containing solver performance data
     solverPerformance solverPerf(typeName, fieldName_);
 
@@ -60,7 +58,7 @@ Foam::solverPerformance Foam::GAMGSolver::solve
     }
     else
     {
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
     }
 
     // Create the storage for the finestCorrection which may be used as a

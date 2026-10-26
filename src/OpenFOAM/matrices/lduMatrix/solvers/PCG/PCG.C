@@ -82,8 +82,6 @@ Foam::solverPerformance Foam::PCG::scalarSolve
         fieldName_
     );
 
-    const bool useLowerCSR = controlDict_.getOrDefault<bool>("useLowerCSR", false);
-
     label nCells = psi.size();
     label nInternalFaces = matrix().lduAddr().upperAddr().size();
 
@@ -107,7 +105,7 @@ Foam::solverPerformance Foam::PCG::scalarSolve
     }
     else
     {
-        matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+        matrix_.Amul(wA, psi, interfaceBouCoeffs_, interfaces_, cmpt);
     }
 
     // --- Calculate initial residual field
@@ -190,7 +188,7 @@ Foam::solverPerformance Foam::PCG::scalarSolve
             }
             else
             {
-                matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt, useLowerCSR);
+                matrix_.Amul(wA, pA, interfaceBouCoeffs_, interfaces_, cmpt);
             }
 
             solveScalar wApA = gSumProd(wA, pA, matrix().mesh().comm());
