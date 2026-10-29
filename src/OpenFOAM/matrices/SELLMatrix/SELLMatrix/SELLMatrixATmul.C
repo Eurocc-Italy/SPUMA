@@ -274,7 +274,7 @@ void Foam::SELLMatrix::residual
     //Update interface interfaces
     matrix().updateMatrixInterfaces
     (
-        true,
+        false,
         interfaceBouCoeffs,
         interfaces,
         psi,
