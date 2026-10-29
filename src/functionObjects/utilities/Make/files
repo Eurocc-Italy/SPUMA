@@ -61,4 +61,8 @@ radiometerProbes/radiometerProbes.C
 
 syncObjects/syncObjects.C
 
+check/interfaceCheck/interfaceCheckFunctionObject.C
+
+writeTurboFields/writeTurboFields.C
+
 LIB = $(FOAM_LIBBIN)/libutilityFunctionObjects
