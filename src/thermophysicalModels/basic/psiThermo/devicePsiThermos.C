@@ -42,6 +42,10 @@ License
 #include "constTransport.H"
 #include "sutherlandTransport.H"
 
+#include "IAPWSIF97metaGas.H"
+#include "IAPWSIF97metaThermo.H"
+#include "IAPWSIF97Transport.H"
+
 #include "hPolynomialThermo.H"
 #include "polynomialTransport.H"
 
@@ -81,6 +85,17 @@ makeThermos
     specie
 );
 
+makeThermos
+(
+    psiThermo,
+    deviceHePsiThermo,
+    pureMixture,
+    IAPWSIF97Transport,
+    sensibleEnthalpy,
+    IAPWSIF97metaThermo,
+    IAPWSIF97metaGas,
+    specie
+);
 
 /* * * * * * * * * * * * * * Internal-energy-based * * * * * * * * * * * * * */
 
