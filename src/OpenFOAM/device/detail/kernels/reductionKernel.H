@@ -120,22 +120,14 @@ void reductionLambdaSumKernel
     __syncthreads();
 
     if constexpr(
-        std::is_same_v<resultType,Foam::scalar>     ||
-        std::is_same_v<resultType,Foam::label>      ||
-        std::is_same_v<resultType,Foam::solveScalar>
+        std::is_same_v<resultType, Foam::scalar>     ||
+        std::is_same_v<resultType, Foam::label>      ||
+        std::is_same_v<resultType, Foam::solveScalar>
     )
     {
         if(tid == 0)
         {
             atomicAdd(result,sdata[0]);
-        }
-    }
-    else if constexpr(std::is_same_v<resultType,Foam::vector> || std::is_same_v<resultType,Foam::tensor>)
-    {
-        // parallel atomics for components of vector/tensor types
-        if (tid < resultType::nComponents)
-        {
-            atomicAdd(reinterpret_cast<typename resultType::cmptType*>(result) + tid, sdata[0][tid]);
         }
     }
     else
