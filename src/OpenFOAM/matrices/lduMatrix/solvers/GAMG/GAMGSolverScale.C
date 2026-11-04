@@ -45,7 +45,7 @@ void Foam::GAMGSolver::scale
 {
     if (cmatrix_)
     {
-        (*cmatrix).Amul
+        (*cmatrix_).Amul
         (
             Acf,
             field,
@@ -53,6 +53,7 @@ void Foam::GAMGSolver::scale
             interfaceLevel,
             cmpt
         );
+    }
     else
     {
         A.Amul
