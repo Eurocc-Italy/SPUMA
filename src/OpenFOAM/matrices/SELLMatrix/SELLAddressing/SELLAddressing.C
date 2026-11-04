@@ -31,6 +31,27 @@ License
 #include "SELLAddressing.H"
 #include "scalarField.H"
 #include "deviceInits.H"
+#include "registerSwitch.H"
+#include "debug.H"
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+#if defined(have_cuda) || defined(have_hip)
+// Not modifiable by the user
+Foam::label Foam::SELLAddressing::C(Foam::foamDeviceInit::getNumberOfThreadsPerBlock());
+#else
+// User-defined value
+Foam::label Foam::SELLAddressing::C
+(
+    Foam::debug::optimisationSwitch("sellC", 1)
+);
+registerOptSwitch
+(
+    "sellC",
+    Foam::label,
+    Foam::SELLAddressing::C
+);
+#endif
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -38,7 +59,6 @@ Foam::SELLAddressing::SELLAddressing()
 :
     numRows_(0),
     numEntries_(0),
-    C_(foamDeviceInit::getNumberOfThreadsPerBlock()),
     numSlices_(0)
 {}
 
@@ -50,7 +70,6 @@ Foam::SELLAddressing::SELLAddressing
 :
     numRows_(0),
     numEntries_(0),
-    C_(foamDeviceInit::getNumberOfThreadsPerBlock()),
     numSlices_(0)
 {
     calcAddr(addr);
@@ -67,7 +86,7 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
     const label sigma = 1;  // no sorting
     const label nCells = addr.size();
     const label nInternalFaces = addr.upperAddr().size();
-    numSlices_ = (nCells + C_ - 1) / C_;
+    numSlices_ = (nCells + C - 1) / C;
     numRows_ = nCells;
 
     const labelUList& lowerAddr = addr.lowerAddr();
@@ -94,8 +113,8 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
 
     for (label s = 0; s < numSlices_; ++s) 
     {
-        const label rowStart = s * C_;
-        const label rowEnd = (rowStart + C_ > nCells) ? nCells : rowStart + C_;
+        const label rowStart = s * C;
+        const label rowEnd = (rowStart + C > nCells) ? nCells : rowStart + C;
         label maxWidth = 0;
         
         for (label rowi = rowStart; rowi < rowEnd; ++rowi) 
@@ -121,7 +140,7 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
     sliceBegins[0] = 0;
     for (label s = 0; s < numSlices_; ++s)
     {
-        sliceBegins[s + 1] = sliceBegins[s] + sliceWidths[s] * C_;
+        sliceBegins[s + 1] = sliceBegins[s] + sliceWidths[s] * C;
     }
     numEntries_ = sliceBegins[numSlices_];
 
@@ -168,11 +187,11 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
 
         // Entry (i, j)
         {
-            const label slicei = i / C_;                                // Slice index
-            const label sliceRowi = i % C_;                             // Local row index in slice
+            const label slicei = i / C;                                 // Slice index
+            const label sliceRowi = i % C;                              // Local row index in slice
             const label sliceBegin = sliceBegins[slicei];
             const label sloti = currentSlot[i]++;
-            const label slotRowi = sliceBegin + sloti * C_ + sliceRowi; // Column-major layout within slice
+            const label slotRowi = sliceBegin + sloti * C + sliceRowi;  // Column-major layout within slice
 
             cols[slotRowi] = j;
             upperToSELL[facei] = slotRowi; 
@@ -180,11 +199,11 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
 
         // Symmetric entry (j, i)
         {
-            const label slicei = j / C_;                               // Slice index
-            const label sliceRowi = j % C_;                            // Local row index in slice
+            const label slicei = j / C;                                // Slice index
+            const label sliceRowi = j % C;                             // Local row index in slice
             const label sliceBegin = sliceBegins[slicei];
             const label sloti = currentSlot[j]++;
-            const label slotRowi = sliceBegin + sloti * C_ + sliceRowi; // Column-major layout within slice
+            const label slotRowi = sliceBegin + sloti * C + sliceRowi; // Column-major layout within slice
 
             cols[slotRowi] = i;
             lowerToSELL[facei] = slotRowi;
@@ -220,8 +239,8 @@ void Foam::SELLAddressing::printInfo(const lduAddressing& addr) const
 
     for (label s = 0; s < numSlices_; ++s)
     {
-        const label rowStart = s * C_;
-        const label rowEnd = (rowStart + C_ > nCells) ? nCells : rowStart + C_;
+        const label rowStart = s * C;
+        const label rowEnd = (rowStart + C > nCells) ? nCells : rowStart + C;
         newNnz += sliceWidths[s] * (rowEnd - rowStart);
     }
 

@@ -57,7 +57,7 @@ void Foam::SELLMatrix::Amul
     const scalar* const __restrict__ valuesPtr = values().begin();
 
     const label nCells = psi.size();
-    const label C = addr.C();
+    const label C = SELLAddressing::C;
 
     const label* const __restrict__ sliceWidthsPtr = addr.sliceWidths().cbegin();
     const label* const __restrict__ sliceBeginsPtr = addr.sliceBegins().cbegin();
@@ -148,7 +148,7 @@ void Foam::SELLMatrix::sumA
     const scalar* const __restrict__ valuesPtr = values().begin();
 
     const label nCells = matrix().diag().size();
-    const label C = addr.C();
+    const label C = SELLAddressing::C;
 
     const label* const __restrict__ sliceWidthsPtr = addr.sliceWidths().cbegin();
     const label* const __restrict__ sliceBeginsPtr = addr.sliceBegins().cbegin();
@@ -224,7 +224,7 @@ void Foam::SELLMatrix::residual
     const scalar* const __restrict__ valuesPtr = values().begin();
 
     const label nCells = psi.size();
-    const label C = addr.C();
+    const label C = SELLAddressing::C;
 
     const label* const __restrict__ sliceWidthsPtr = addr.sliceWidths().cbegin();
     const label* const __restrict__ sliceBeginsPtr = addr.sliceBegins().cbegin();

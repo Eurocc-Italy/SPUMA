@@ -73,11 +73,16 @@ class SELLAddressing
         //- Number of entries (after padding)
         mutable label numEntries_;
 
-        //- Vector length of each slice
-        const label C_;
-
         //- Number of slices
         mutable label numSlices_;
+
+public:
+
+	//- Vector length of each slice. It should be equal to the SIMD width
+        // (or number of lanes) on CPUs or to the warp size (or wavefront)
+        // on GPUs. Since optimal C can be different from this hardware value,
+        // user can modify it by setting its value in the controlDict.
+        static label C;
 
 
     //- Demand-driven data
@@ -150,12 +155,6 @@ public:
         label numEntries() const noexcept
         {
             return numEntries_;
-        }
-
-        //- Return the vector length
-        label C() const noexcept
-        {
-            return C_;
         }
 
         //- Return the number of slices
