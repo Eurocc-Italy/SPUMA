@@ -229,7 +229,7 @@ void Foam::SELLAddressing::printInfo(const lduAddressing& addr) const
          << "    original nnz: " << origNnz << nl
          << "    current nnz (after padding): " << newNnz << nl
          << "    paddingFactor: " << 100.* scalar(newNnz - origNnz)/scalar(origNnz) << nl
-         << "    chunk occupancy (beta) " << scalar(origNnz) / scalar(newNnz) << nl;
+         << "    chunk occupancy (beta): " << scalar(origNnz) / scalar(newNnz) << nl;
 }
 
 

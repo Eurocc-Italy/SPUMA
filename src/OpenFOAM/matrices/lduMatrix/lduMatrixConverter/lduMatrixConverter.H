@@ -73,10 +73,10 @@ public:
 
 
     // Static Member Functions
-    
-        //- Convert an LDU matrix into a different, user-defined one  
-        static std::unique_ptr<SparseMatrix> convert
-        ( 
+
+        //- Convert an LDU matrix into a different, user-defined one
+        static std::shared_ptr<SparseMatrix> convert
+        (
             const lduMatrix& mat,
             const SparseMatrix::matrixFormatTypes matrixFormatType
         );

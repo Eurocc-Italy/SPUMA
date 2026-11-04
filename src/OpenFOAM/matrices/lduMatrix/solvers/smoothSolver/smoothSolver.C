@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2014 OpenFOAM Foundation
     Copyright (C) 2016-2021 OpenCFD Ltd.
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -109,7 +110,7 @@ Foam::solverPerformance Foam::smoothSolver::solve
 
         if (cmatrix_)
         {
-            smootherPtr->setCMatrix(cmatrix_.get());
+            smootherPtr->setCMatrix(cmatrix_);
         }
 
         smootherPtr->smooth
@@ -189,7 +190,7 @@ Foam::solverPerformance Foam::smoothSolver::solve
 
             if (cmatrix_)
             {
-                smootherPtr->setCMatrix(cmatrix_.get());
+                smootherPtr->setCMatrix(cmatrix_);
             }
 
             // Smoothing loop

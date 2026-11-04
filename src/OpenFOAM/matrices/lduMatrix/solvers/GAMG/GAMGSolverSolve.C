@@ -189,12 +189,6 @@ Foam::solverPerformance Foam::GAMGSolver::solve
             )
          || solverPerf.nIterations() < minIter_
         );
-
-        // Clear the converted matrices for all the levels except the first one
-        for (label leveli=0; leveli < matrixLevels_.size(); leveli++)
-        {
-            smoothers[leveli + 1].clearOut();
-        }
     }
 
     matrix().setResidualField
@@ -537,7 +531,7 @@ void Foam::GAMGSolver::initVcycle
 
     if (cmatrix_)
     {
-        smoothers[0].setCMatrix(cmatrix_.get());
+        smoothers[0].setCMatrix(cmatrix_);
     }
 
     forAll(matrixLevels_, leveli)
@@ -576,7 +570,7 @@ void Foam::GAMGSolver::initVcycle
             if (cmatrix_)
             {
                 auto cmatrixCoarse = lduMatrixConverter::convert(mat, matrixFormatType());
-                smoothers[leveli + 1].setCMatrix(cmatrixCoarse.release());
+                smoothers[leveli + 1].setCMatrix(cmatrixCoarse);
             }
         }
     }

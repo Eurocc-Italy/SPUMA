@@ -149,7 +149,7 @@ public:
             lduInterfaceFieldPtrsList interfaces_;
 
             //- Converted matrix (if requested)
-            std::unique_ptr<SparseMatrix> cmatrix_;
+            std::shared_ptr<SparseMatrix> cmatrix_;
 
             //- Dictionary of solution controls
             dictionary controlDict_;
@@ -377,7 +377,7 @@ public:
             const lduInterfaceFieldPtrsList& interfaces_;
 
             //- Converted matrix (if requested)
-            SparseMatrix* cmatrix_;
+            std::shared_ptr<SparseMatrix> cmatrix_;
 
             //- Dictionary of solution controls
             dictionary controlDict_;
@@ -499,7 +499,7 @@ public:
                 return interfaces_;
             }
 
-            void setCMatrix(SparseMatrix* matrix) noexcept
+            void setCMatrix(std::shared_ptr<SparseMatrix> matrix) noexcept
             {
                 cmatrix_ = matrix;
             }
@@ -521,9 +521,6 @@ public:
                 const direction cmpt,
                 const label nSweeps
             ) const = 0;
-
-	    //- Clear the memory associated to CMatrix
-	    void clearOut();
     };
 
 

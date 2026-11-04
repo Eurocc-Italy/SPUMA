@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2016 OpenFOAM Foundation
     Copyright (C) 2017-2024 OpenCFD Ltd.
-    Copyright (C) 2026 Cineca
+    Copyright (C) 2025-2026 Cineca
     Copyright (C) 2026 Gabriele Ceccolini - Unibo
 -------------------------------------------------------------------------------
 License

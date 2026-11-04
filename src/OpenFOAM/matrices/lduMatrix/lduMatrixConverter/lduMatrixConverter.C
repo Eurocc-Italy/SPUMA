@@ -30,7 +30,7 @@ License
 
 // * * * * * * * * * * * * * * Static Member Fuctions  * * * * * * * * * * * //
 
-std::unique_ptr<Foam::SparseMatrix> Foam::lduMatrixConverter::convert
+std::shared_ptr<Foam::SparseMatrix> Foam::lduMatrixConverter::convert
 (
     const lduMatrix& mat,
     SparseMatrix::matrixFormatTypes matrixFormatType 
@@ -45,7 +45,7 @@ std::unique_ptr<Foam::SparseMatrix> Foam::lduMatrixConverter::convert
 
         case SparseMatrix::matrixFormatTypes::SELL_MATRIX_FORMAT:
         {
-            return std::make_unique<SELLMatrix>(mat);
+            return std::make_shared<SELLMatrix>(mat);
         }
 
         default:
