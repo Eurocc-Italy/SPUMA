@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2016-2024 OpenCFD Ltd.
-    Copyright (C) 2026 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -258,7 +258,7 @@ public:
 
     // Ostream Operators
 
-        friend Ostream& operator<<(Ostream&, const lduMatrix&);
+        friend Ostream& operator<<(Ostream&, const SELLMatrix&);
         friend Ostream& operator<<(Ostream&, const InfoProxy<SELLMatrix>&);
 };
 
