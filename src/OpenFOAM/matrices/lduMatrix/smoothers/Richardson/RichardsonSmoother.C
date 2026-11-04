@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2015 OpenFOAM Foundation
     Copyright (C) 2017-2019 OpenCFD Ltd.
-    Copyright (C) 2026 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -78,17 +78,20 @@ Foam::RichardsonSmoother::RichardsonSmoother
     else if (subPreconditionerName_ == l1diagonalPreconditioner::typeName)
     {
         preconditioner_ = autoPtr<l1diagonalPreconditioner>::New
-            (
-                matrix,
-                interfaceBouCoeffs,
-                interfaces,
-                solverControls
-            );
+        (
+            matrix,
+            interfaceBouCoeffs,
+            interfaces,
+            solverControls
+        );
     }
     else 
     {
-        FatalErrorInFunction<<"precondtioner type: " <<
-            subPreconditionerName_ << " not supported"<<abort(FatalError);
+        FatalErrorInFunction
+            << "precondtioner type: "
+            << subPreconditionerName_
+            << " not supported"
+            << abort(FatalError);
     }
 }
 
@@ -99,7 +102,7 @@ void Foam::RichardsonSmoother::readControls()
 {
     omega_ = controlDict_.getOrDefault<scalar>("omega", 0.75);
     subPreconditionerName_ = 
-        controlDict_.get<word>("subPreconditioner");
+    controlDict_.get<word>("subPreconditioner");
 }
 
 
@@ -122,7 +125,14 @@ void Foam::RichardsonSmoother::smooth_
     for (label sweep=0; sweep<nSweeps; sweep++)
     {
         // --- Calculate A.psi
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        if (cmatrix_)
+        {
+            (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
+        else
+        {
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
 
         preconditioner_().precondition(Apsi, source - Apsi);
 
