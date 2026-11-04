@@ -136,6 +136,19 @@ $(csys)/cartesianCS.C
 $(csys)/cylindricalCS.C
 $(csys)/indirectCS.C
 
+fecsys = primitives/coordinate/feSystems
+$(fecsys)/fe_coordinateSystems.C
+$(fecsys)/fe_parabolicCylindricalCS.C
+$(fecsys)/fe_ellipticCylindricalCS.C
+$(fecsys)/fe_toroidalCS.C
+$(fecsys)/fe_newCoordinateSystem.C
+$(fecsys)/fe_cylindricalCS.C
+$(fecsys)/fe_sphericalCS.C
+$(fecsys)/coordinateRotation/fe_coordinateRotation.C
+$(fecsys)/coordinateRotation/fe_EulerCoordinateRotation.C
+$(fecsys)/coordinateRotation/fe_STARCDCoordinateRotation.C
+$(fecsys)/coordinateRotation/fe_axisCoordinateRotation.C
+
 crot = primitives/coordinate/rotation
 $(crot)/axesRotation.C
 $(crot)/axisAngleRotation.C
@@ -145,6 +158,7 @@ $(crot)/identityRotation.C
 $(crot)/specifiedRotation.C
 $(crot)/EulerCoordinateRotation.C
 $(crot)/STARCDCoordinateRotation.C
+$(crot)/RodriguesRotation.C
 
 strings = primitives/strings
 $(strings)/string/string.C
@@ -863,6 +877,9 @@ algorithms/indexedOctree/treeDataPoint.C
 
 algorithms/dynamicIndexedOctree/dynamicIndexedOctreeBase.C
 algorithms/dynamicIndexedOctree/dynamicTreeDataPoint.C
+
+algorithms/polygon/clipping/SutherlandHodgman.C
+algorithms/polygon/pointInPolygon/HormannAgathos.C
 
 parallel/commSchedule/commSchedule.C
 parallel/globalIndex/globalIndex.cxx

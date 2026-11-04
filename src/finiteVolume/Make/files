@@ -43,6 +43,7 @@ $(constraintFvPatches)/cyclic/cyclicFvPatch.C
 $(constraintFvPatches)/cyclicAMI/cyclicAMIFvPatch.C
 $(constraintFvPatches)/cyclicACMI/cyclicACMIFvPatch.C
 $(constraintFvPatches)/overlapAMI/overlapAMIFvPatch.C
+$(constraintFvPatches)/mixingPlane/mixingPlaneFvPatch.C
 $(constraintFvPatches)/cyclicSlip/cyclicSlipFvPatch.C
 $(constraintFvPatches)/empty/emptyFvPatch.C
 $(constraintFvPatches)/nonuniformTransformCyclic/nonuniformTransformCyclicFvPatch.C
@@ -148,6 +149,7 @@ $(constraintFvPatchFields)/cyclic/cyclicFvPatchFields.C
 $(constraintFvPatchFields)/cyclicAMI/cyclicAMIFvPatchFields.C
 $(constraintFvPatchFields)/cyclicACMI/cyclicACMIFvPatchFields.C
 $(constraintFvPatchFields)/overlapAMI/overlapAMIFvPatchFields.C
+$(constraintFvPatchFields)/mixingPlane/mixingPlaneFvPatchFields.C
 $(constraintFvPatchFields)/cyclicSlip/cyclicSlipFvPatchFields.C
 $(constraintFvPatchFields)/empty/emptyFvPatchFields.C
 $(constraintFvPatchFields)/jumpCyclic/jumpCyclicFvPatchFields.C
@@ -277,6 +279,7 @@ $(constraintFvsPatchFields)/cyclic/cyclicFvsPatchFields.C
 $(constraintFvsPatchFields)/cyclicAMI/cyclicAMIFvsPatchFields.C
 $(constraintFvsPatchFields)/cyclicACMI/cyclicACMIFvsPatchFields.C
 $(constraintFvsPatchFields)/overlapAMI/overlapAMIFvsPatchFields.C
+$(constraintFvsPatchFields)/mixingPlane/mixingPlaneFvsPatchFields.C
 $(constraintFvsPatchFields)/cyclicSlip/cyclicSlipFvsPatchFields.C
 $(constraintFvsPatchFields)/empty/emptyFvsPatchFields.C
 $(constraintFvsPatchFields)/nonuniformTransformCyclic/nonuniformTransformCyclicFvsPatchFields.C

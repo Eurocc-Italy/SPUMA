@@ -94,6 +94,7 @@ indexedOctree/treeDataFace.C
 indexedOctree/treeDataPrimitivePatchBase.C
 indexedOctree/treeDataTriSurface.C
 
+octree/octreeDataBoundBox.C
 
 searchableSurfaces/closedTriSurfaceMesh/closedTriSurfaceMesh.C
 searchableSurfaces/searchableBox/searchableBox.C
@@ -322,6 +323,18 @@ $(AMIOverlapPatches)/overlapAMIPointPatchField/overlapAMIPointPatchFields.C
 
 PeriodicAMICycPatches=$(AMI)/patches/cyclicPeriodicAMI
 $(PeriodicAMICycPatches)/cyclicPeriodicAMIPolyPatch/cyclicPeriodicAMIPolyPatch.C
+
+MPI=mixingPlaneInterpolation
+mixingPlanePatches=$(MPI)/patches/mixingPlane
+$(mixingPlanePatches)/mixingPlaneLduInterface/mixingPlaneLduInterface.C
+$(mixingPlanePatches)/mixingPlaneLduInterfaceField/mixingPlaneLduInterfaceField.C
+$(mixingPlanePatches)/mixingPlanePolyPatch/mixingPlanePolyPatch.C
+$(mixingPlanePatches)/mixingPlanePointPatch/mixingPlanePointPatch.C
+$(mixingPlanePatches)/mixingPlaneInterpolation/mixingPlaneInterpolationName.C
+
+GGI=GGIInterpolation
+GGIPatches=$(GGI)/patches/GGI
+$(GGIPatches)/GGIInterpolation/GGIInterpolationName.C
 
 extraPreconditioners=matrices/lduMatrix/preconditioners/distributedDILUPreconditioner
 $(extraPreconditioners)/distributedDILUPreconditioner.C
