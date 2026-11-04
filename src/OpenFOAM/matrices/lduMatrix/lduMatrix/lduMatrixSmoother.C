@@ -178,4 +178,13 @@ Foam::lduMatrix::smoother::smoother
 {}
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::lduMatrix::smoother::clearOut()
+{
+    if (cmatrix_)
+        delete cmatrix_;
+}
+
+
 // ************************************************************************* //

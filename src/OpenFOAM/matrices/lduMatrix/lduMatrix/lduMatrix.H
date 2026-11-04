@@ -296,6 +296,11 @@ public:
                 return matrix_;
             }
 
+            SparseMatrix::matrixFormatTypes matrixFormatType() const noexcept
+            {
+                return matrixFormatType_;
+            }
+
             const FieldField<Field, scalar>& interfaceBouCoeffs() const noexcept
             {
                 return interfaceBouCoeffs_;
@@ -354,10 +359,6 @@ public:
             {
                 return this->normFactor(psi, source, Apsi, tmpField, normType_);
             }
-
-            //- Convert the matrix using a user-defined format
-            // for the SpMVM kernel
-            void convert();
     };
 
 
@@ -520,6 +521,9 @@ public:
                 const direction cmpt,
                 const label nSweeps
             ) const = 0;
+
+	    //- Clear the memory associated to CMatrix
+	    void clearOut();
     };
 
 

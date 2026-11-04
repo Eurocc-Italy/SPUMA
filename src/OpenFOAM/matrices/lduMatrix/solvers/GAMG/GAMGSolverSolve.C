@@ -32,6 +32,8 @@ License
 #include "GAMGSolver.H"
 #include "SubField.H"
 #include "PrecisionAdaptor.H"
+#include "SELLMatrix.H"
+#include "lduMatrixConverter.H"
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -187,6 +189,12 @@ Foam::solverPerformance Foam::GAMGSolver::solve
             )
          || solverPerf.nIterations() < minIter_
         );
+
+        // Clear the converted matrices for all the levels except the first one
+        for (label leveli=0; leveli < matrixLevels_.size(); leveli++)
+        {
+            smoothers[leveli + 1].clearOut();
+        }
     }
 
     matrix().setResidualField
@@ -567,7 +575,8 @@ void Foam::GAMGSolver::initVcycle
 
             if (cmatrix_)
             {
-                smoothers[leveli + 1].setCMatrix(cmatrix_.get());
+                auto cmatrixCoarse = lduMatrixConverter::convert(mat, matrixFormatType());
+                smoothers[leveli + 1].setCMatrix(cmatrixCoarse.release());
             }
         }
     }

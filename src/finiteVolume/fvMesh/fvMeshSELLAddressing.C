@@ -36,7 +36,6 @@ Foam::fvMeshSELLAddressing::fvMeshSELLAddressing(const fvMesh& mesh)
 : 
     SELLAddressing
     (
-        mesh.nCells(), 
         mesh.lduAddr()
     )
 {}

@@ -45,29 +45,30 @@ Foam::SELLAddressing::SELLAddressing()
 
 Foam::SELLAddressing::SELLAddressing
 (
-    const label numRows,
     const lduAddressing& addr
 )
 :
-    numRows_(numRows),
+    numRows_(0),
     numEntries_(0),
     C_(foamDeviceInit::getNumberOfThreadsPerBlock()),
     numSlices_(0)
 {
     calcAddr(addr);
-
-    printInfo(addr);
 }
 
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
 {
+    if (numRows_ > 0)
+        return;
+
     const label sigma = 1;  // no sorting
-    const label nCells = numRows();
+    const label nCells = addr.size();
     const label nInternalFaces = addr.upperAddr().size();
     numSlices_ = (nCells + C_ - 1) / C_;
+    numRows_ = nCells;
 
     const labelUList& lowerAddr = addr.lowerAddr();
     const labelUList& upperAddr = addr.upperAddr();
@@ -189,13 +190,17 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
             lowerToSELL[facei] = slotRowi;
         }
     }
+
+    printInfo(addr);
 }
 
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
 void Foam::SELLAddressing::clearOut()
 {
+    numRows_ = 0;
+    numEntries_ = 0;
+    numSlices_ = 0;
+
     lowerToSELLPtr_.reset(nullptr);
     upperToSELLPtr_.reset(nullptr);
     sliceBeginsPtr_.reset(nullptr);
@@ -223,7 +228,8 @@ void Foam::SELLAddressing::printInfo(const lduAddressing& addr) const
     Info << "SELLAddressing info:" << nl
          << "    original nnz: " << origNnz << nl
          << "    current nnz (after padding): " << newNnz << nl
-         << "    paddingFactor: " << 100.* double(newNnz - origNnz)/double(origNnz) << nl;
+         << "    paddingFactor: " << 100.* scalar(newNnz - origNnz)/scalar(origNnz) << nl
+         << "    chunk occupancy (beta) " << scalar(origNnz) / scalar(newNnz) << nl;
 }
 
 

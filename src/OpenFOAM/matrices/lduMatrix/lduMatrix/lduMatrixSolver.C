@@ -31,6 +31,7 @@ License
 #include "diagonalSolver.H"
 #include "PrecisionAdaptor.H"
 #include "SELLMatrix.H"
+#include "lduMatrixConverter.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -190,7 +191,7 @@ Foam::lduMatrix::solver::solver
 {
     readControls();
 
-    convert();
+    cmatrix_ = lduMatrixConverter::convert(matrix, matrixFormatType_);
 }
 
 
@@ -287,25 +288,6 @@ Foam::solveScalarField::cmptType Foam::lduMatrix::solver::normFactor
 
     // Fall-through: no norm
     return solveScalarField::cmptType(1);
-}
-
-
-void Foam::lduMatrix::solver::convert()
-{
-    switch (matrixFormatType_)
-    {
-        case SparseMatrix::matrixFormatTypes::DEFAULT_MATRIX_FORMAT:
-        {
-            cmatrix_ = nullptr;
-            break;
-        }
-
-        case SparseMatrix::matrixFormatTypes::SELL_MATRIX_FORMAT:
-        {
-            cmatrix_ = std::make_unique<SELLMatrix>(matrix_);
-            break;
-        }
-    }
 }
 
 

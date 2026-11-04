@@ -68,7 +68,7 @@ class SELLAddressing
     // Private Data
 
         //- Number of equations/rows
-        label numRows_;
+        mutable label numRows_;
 
         //- Number of entries (after padding)
         mutable label numEntries_;
@@ -100,9 +100,6 @@ class SELLAddressing
 
     // Private Member Functions
 
-        //- Calculate all SELL addressing arrays from an lduAddressing
-        void calcAddr(const lduAddressing& addr) const;
-
         //- Clear addressing
         void clearOut();
 
@@ -127,7 +124,6 @@ public:
         // number of entries and lduAddressing
         SELLAddressing
         (
-            const label numRows, 
             const lduAddressing& addr
         );
 
@@ -140,6 +136,9 @@ public:
 
 
     // Member Functions
+
+        //- Calculate all SELL addressing arrays from an lduAddressing
+        void calcAddr(const lduAddressing& addr) const;
 
         //- Return number of equations/rows
         label numRows() const noexcept

@@ -215,12 +215,14 @@ public:
             //- Return SELL addressing
             virtual const SELLAddressing& SELLAddr() const
             {
+                calcAddr(lduAddr());
                 return *this;
             }
 
             //- Return non-const SELL addressing
             virtual SELLAddressing& SELLAddr()
             {
+                calcAddr(lduAddr());
                 return *this;
             }
 
