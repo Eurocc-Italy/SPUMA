@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2017-2022 OpenCFD Ltd.
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -43,14 +43,27 @@ void Foam::GAMGSolver::scale
     const direction cmpt
 ) const
 {
-    A.Amul
-    (
-        Acf,
-        field,
-        interfaceLevelBouCoeffs,
-        interfaceLevel,
-        cmpt
-    );
+    if (cmatrix_)
+    {
+        (*cmatrix).Amul
+        (
+            Acf,
+            field,
+            interfaceLevelBouCoeffs,
+            interfaceLevel,
+            cmpt
+        );
+    else
+    {
+        A.Amul
+        (
+            Acf,
+            field,
+            interfaceLevelBouCoeffs,
+            interfaceLevel,
+            cmpt
+        );
+    }
 
     const label nCells = field.size();
     solveScalar* __restrict__ fieldPtr = field.begin();
