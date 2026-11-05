@@ -137,6 +137,7 @@ $(csys)/cylindricalCS.C
 $(csys)/indirectCS.C
 
 fecsys = primitives/coordinate/feSystems
+$(fecsys)/fe_coordinateSystem.C
 $(fecsys)/fe_coordinateSystems.C
 $(fecsys)/fe_parabolicCylindricalCS.C
 $(fecsys)/fe_ellipticCylindricalCS.C
