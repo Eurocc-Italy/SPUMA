@@ -265,6 +265,7 @@ class GAMGSolver
             solveScalarField& field,
             solveScalarField& Acf,
             const lduMatrix& A,
+            const std::shared_ptr<SparseMatrix> cmatrix,
             const FieldField<Field, scalar>& interfaceLevelBouCoeffs,
             const lduInterfaceFieldPtrsList& interfaceLevel,
             const solveScalarField& source,

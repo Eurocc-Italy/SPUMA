@@ -37,15 +37,16 @@ void Foam::GAMGSolver::scale
     solveScalarField& field,
     solveScalarField& Acf,
     const lduMatrix& A,
+    const std::shared_ptr<SparseMatrix> cmatrix,
     const FieldField<Field, scalar>& interfaceLevelBouCoeffs,
     const lduInterfaceFieldPtrsList& interfaceLevel,
     const solveScalarField& source,
     const direction cmpt
 ) const
 {
-    if (cmatrix_)
+    if (cmatrix)
     {
-        (*cmatrix_).Amul
+        (*cmatrix).Amul
         (
             Acf,
             field,

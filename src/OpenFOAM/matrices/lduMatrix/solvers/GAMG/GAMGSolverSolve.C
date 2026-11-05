@@ -9,7 +9,7 @@
     Copyright (C) 2016-2021,2023 OpenCFD Ltd.
     Copyright (C) 2023 Huawei (Yu Ankun)
     Copyright (C) 2023 OpenCFD Ltd.
-    Copyright (C) 2025 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -273,6 +273,7 @@ void Foam::GAMGSolver::Vcycle
                             static_cast<const solveScalarField&>(ACf)
                         ),
                         matrixLevels_[leveli],
+                        smoothers[leveli + 1].cmatrix(),
                         interfaceLevelsBouCoeffs_[leveli],
                         interfaceLevels_[leveli],
                         coarseSources[leveli],
@@ -412,6 +413,7 @@ void Foam::GAMGSolver::Vcycle
                     coarseCorrFields[leveli],
                     ACfRef,
                     matrixLevels_[leveli],
+                    smoothers[leveli + 1].cmatrix(),
                     interfaceLevelsBouCoeffs_[leveli],
                     interfaceLevels_[leveli],
                     coarseSources[leveli],
@@ -472,6 +474,7 @@ void Foam::GAMGSolver::Vcycle
             finestCorrection,
             Apsi,
             matrix_,
+            cmatrix_,
             interfaceBouCoeffs_,
             interfaces_,
             finestResidual,

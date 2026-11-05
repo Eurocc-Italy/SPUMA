@@ -7,7 +7,7 @@
 -------------------------------------------------------------------------------
     Copyright (C) 2011-2017 OpenFOAM Foundation
     Copyright (C) 2016-2024 OpenCFD Ltd.
-    Copyright (C) 2026 Cineca
+    Copyright (C) 2025-2026 Cineca
 -------------------------------------------------------------------------------
 License
     This file is part of OpenFOAM.
@@ -484,6 +484,16 @@ public:
                 return matrix_;
             }
 
+            const std::shared_ptr<SparseMatrix> cmatrix() const noexcept
+            {
+                return cmatrix_;
+            }
+
+            void setCMatrix(std::shared_ptr<SparseMatrix> matrix) noexcept
+            {
+                cmatrix_ = matrix;
+            }
+
             const FieldField<Field, scalar>& interfaceBouCoeffs() const noexcept
             {
                 return interfaceBouCoeffs_;
@@ -497,11 +507,6 @@ public:
             const lduInterfaceFieldPtrsList& interfaces() const noexcept
             {
                 return interfaces_;
-            }
-
-            void setCMatrix(std::shared_ptr<SparseMatrix> matrix) noexcept
-            {
-                cmatrix_ = matrix;
             }
 
             //- Smooth the solution for a given number of sweeps
