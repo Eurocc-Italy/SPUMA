@@ -101,8 +101,7 @@ Foam::RichardsonSmoother::RichardsonSmoother
 void Foam::RichardsonSmoother::readControls()
 {
     omega_ = controlDict_.getOrDefault<scalar>("omega", 0.75);
-    subPreconditionerName_ = 
-    controlDict_.get<word>("subPreconditioner");
+    subPreconditionerName_ = controlDict_.get<word>("subPreconditioner");
 }
 
 
@@ -119,8 +118,18 @@ void Foam::RichardsonSmoother::smooth_
 ) const
 {
     const label nCells = psi.size();
+    const scalar omega = this->omega_;
 
     solveScalarField Apsi(nCells);
+    const solveScalar* const __restrict__ ApsiPtr = Apsi.cbegin();
+
+    const solveScalarField& rD = preconditioner_().getReciprocalD();
+    const solveScalar* const __restrict__ rDPtr = rD.cbegin();
+
+    const solveScalar* const __restrict__ sourcePtr = source.cbegin();
+    solveScalar* __restrict__ psiPtr = psi.begin();
+
+    foamExecutor exec;
 
     for (label sweep=0; sweep<nSweeps; sweep++)
     {
@@ -134,9 +143,11 @@ void Foam::RichardsonSmoother::smooth_
             matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
         }
 
-        preconditioner_().precondition(Apsi, source - Apsi);
-
-        psi += omega_*Apsi;
+        auto LambdaUpdatePsi = [=](label celli)
+        {
+            psiPtr[celli] += omega * rDPtr[celli] * (sourcePtr[celli] - ApsiPtr[celli]);
+        };
+        exec.parallelFor(LambdaUpdatePsi, nCells);
     }
 }
 
