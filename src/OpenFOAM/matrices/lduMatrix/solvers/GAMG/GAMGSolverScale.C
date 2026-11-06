@@ -72,28 +72,22 @@ void Foam::GAMGSolver::scale
     const solveScalar* const __restrict__ sourcePtr = source.cbegin();
     const solveScalar* const __restrict__ AcfPtr = Acf.cbegin();
 
-    FixedList<solveScalar, 2> scalingFactor(Zero);
-
     foamExecutor exec;
-    auto sumOp0 = [=] (label i)
-    {
-        return fieldPtr[i]*sourcePtr[i];
-    };
 
-    auto sumOp1 = [=] (label i)
-    {
-        return fieldPtr[i]*AcfPtr[i];
-    };
+    vector2D scalingFactor = Zero;
 
-    exec.reductionSum(sumOp0, &scalingFactor[0], nCells);
-    exec.reductionSum(sumOp1, &scalingFactor[1], nCells);
+    auto sumOpFused = [=] (label i)
+    {
+        return vector2D(fieldPtr[i]*sourcePtr[i], fieldPtr[i]*AcfPtr[i]);
+    };
+    exec.reductionSum(sumOpFused, &scalingFactor, nCells);
 
     A.mesh().reduce(scalingFactor, sumOp<solveScalar>());
 
     const solveScalar sf =
     (
-        scalingFactor[0]
-      / stabilise(scalingFactor[1], pTraits<solveScalar>::vsmall)
+        scalingFactor.x()
+      / stabilise(scalingFactor.y(), pTraits<solveScalar>::vsmall)
     );
 
     if (debug >= 2)
