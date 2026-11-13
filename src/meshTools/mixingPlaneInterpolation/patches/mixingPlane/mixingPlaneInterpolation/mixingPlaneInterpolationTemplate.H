@@ -134,6 +134,7 @@ SourceFiles
 #include "primitivePatch.H"
 #include "standAlonePatch.H"
 #include "twg_CSV.H"
+#include "ListListAddr.H"
 #include <map>
 #include <list>
 
@@ -421,10 +422,15 @@ class MixingPlaneInterpolation
             mutable labelListList* masterPatchToProfileAddrPtr_;
             mutable labelListList* masterProfileToPatchAddrPtr_;
 
+            mutable ListListAddr<labelList>* masterPatchToProfileAddrListAddrPtr_;
+            mutable ListListAddr<labelList>* masterProfileToPatchAddrListAddrPtr_;
+
             //- Master weights
             mutable scalarListList* masterPatchToProfileWeightsPtr_;
             mutable scalarListList* masterProfileToPatchWeightsPtr_;
 
+            mutable ListListAddr<scalarList>* masterPatchToProfileWeightsListAddrPtr_;
+            mutable ListListAddr<scalarList>* masterProfileToPatchWeightsListAddrPtr_;
 
         // Slave patch-to-profile interpolation
 
@@ -432,9 +438,15 @@ class MixingPlaneInterpolation
             mutable labelListList* slavePatchToProfileAddrPtr_;
             mutable labelListList* slaveProfileToPatchAddrPtr_;
 
+            mutable ListListAddr<labelList>* slavePatchToProfileAddrListAddrPtr_;
+            mutable ListListAddr<labelList>* slaveProfileToPatchAddrListAddrPtr_;
+
             //- Slave weights
             mutable scalarListList* slavePatchToProfileWeightsPtr_;
             mutable scalarListList* slaveProfileToPatchWeightsPtr_;
+
+            mutable ListListAddr<scalarList>* slavePatchToProfileWeightsListAddrPtr_;
+            mutable ListListAddr<scalarList>* slaveProfileToPatchWeightsListAddrPtr_;
 
 
     // Private static data
@@ -567,6 +579,17 @@ class MixingPlaneInterpolation
             Field<Type>& profileBandValues
         );
 
+        template<class Type>
+        static void toProfile
+        (
+            const Field<Type>& srcF,
+            const labelListList& srcAddr,
+            const scalarListList& srcWeights,
+            const ListListAddr<labelList>& srcAddrListAddr,
+            const ListListAddr<scalarList>& srcWeightsListAddr,
+            Field<Type>& profileBandValues
+        );
+
         //- Collect from profile given addressing and weights
         template<class Type>
         static void fromProfile
@@ -574,6 +597,17 @@ class MixingPlaneInterpolation
             const Field<Type>& profileBandValues,
             const labelListList& dstAddr,
             const scalarListList& dstWeights,
+            Field<Type>& dstResultF
+        );
+
+        template<class Type>
+        static void fromProfile
+        (
+            const Field<Type>& profileBandValues,
+            const labelListList& dstAddr,
+            const scalarListList& dstWeights,
+            const ListListAddr<labelList>& dstAddrListAddr,
+            const ListListAddr<scalarList>& dstWeightsListAddr,
             Field<Type>& dstResultF
         );
 
@@ -585,6 +619,18 @@ class MixingPlaneInterpolation
             const Field<Type>& profileBandValues,
             const labelListList& dstAddr,
             const scalarListList& dstWeights,
+            Field<Type>& dstResultF,
+            const labelList& mask
+        );
+
+        template<class Type>
+        static void maskedFromProfile
+        (
+            const Field<Type>& profileBandValues,
+            const labelListList& dstAddr,
+            const scalarListList& dstWeights,
+            const ListListAddr<labelList>& dstAddrListAddr,
+            const ListListAddr<scalarList>& dstWeightsListAddr,
             Field<Type>& dstResultF,
             const labelList& mask
         );
@@ -608,6 +654,22 @@ class MixingPlaneInterpolation
             const scalarListList& srcWeights,
             const labelListList& dstAddr,
             const scalarListList& dstWeights,
+            Field<Type>& dstResultF
+        ) const;
+
+        //- Interpolate given source and target, addressing and weights
+        template<class Type>
+        void interpolate
+        (
+            const Field<Type>& srcF,
+            const labelListList& srcAddr,
+            const scalarListList& srcWeights,
+            const labelListList& dstAddr,
+            const scalarListList& dstWeights,
+            const ListListAddr<labelList>& srcAddrListAddr,
+            const ListListAddr<scalarList>& srcWeightsListAddr,
+            const ListListAddr<labelList>& dstAddrListAddr,
+            const ListListAddr<scalarList>& dstWeightsListAddr,
             Field<Type>& dstResultF
         ) const;
 
@@ -733,17 +795,29 @@ public:
             const labelListList& masterPatchToProfileAddr() const;
             const labelListList& masterProfileToPatchAddr() const;
 
+            const ListListAddr<labelList>& masterPatchToProfileAddrListAddr() const;
+            const ListListAddr<labelList>& masterProfileToPatchAddrListAddr() const;
+
             //- Return reference to master weights
             const scalarListList& masterPatchToProfileWeights() const;
             const scalarListList& masterProfileToPatchWeights() const;
+
+            const ListListAddr<scalarList>& masterPatchToProfileWeightsListAddr() const;
+            const ListListAddr<scalarList>& masterProfileToPatchWeightsListAddr() const;
 
             //- Return reference to slave addressing
             const labelListList& slavePatchToProfileAddr() const;
             const labelListList& slaveProfileToPatchAddr() const;
 
+            const ListListAddr<labelList>& slavePatchToProfileAddrListAddr() const;
+            const ListListAddr<labelList>& slaveProfileToPatchAddrListAddr() const;
+
             //- Return reference to slave weights
             const scalarListList& slavePatchToProfileWeights() const;
             const scalarListList& slaveProfileToPatchWeights() const;
+
+            const ListListAddr<scalarList>& slavePatchToProfileWeightsListAddr() const;
+            const ListListAddr<scalarList>& slaveProfileToPatchWeightsListAddr() const;
 
             //- Return reference to masterPatchToProfile tensor field
             const tensorField& masterPatchToProfileT() const;

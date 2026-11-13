@@ -143,7 +143,7 @@ void Foam::mixingPlanePolyPatch::calcZoneAddressing() const
     }
 
     // Calculate patch-to-zone addressing
-    zoneAddressingPtr_ = new labelList(size());
+    zoneAddressingPtr_ = new labelList(size(),poolSwitch(1));
     labelList& zAddr = *zoneAddressingPtr_;
     const faceZone& myZone = zone();
 

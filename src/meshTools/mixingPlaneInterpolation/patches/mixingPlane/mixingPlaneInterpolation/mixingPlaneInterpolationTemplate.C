@@ -439,6 +439,106 @@ slaveProfileToPatchWeights() const
 
 
 template<class MasterPatch, class SlavePatch>
+const Foam::ListListAddr<labelList>&
+Foam::MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+masterPatchToProfileAddrListAddr() const
+{
+    if (!masterPatchToProfileAddrListAddrPtr_)
+        calcAddressing();
+    return *masterPatchToProfileAddrListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const Foam::ListListAddr<labelList>&
+Foam::MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+masterProfileToPatchAddrListAddr() const
+{
+    if (!masterProfileToPatchAddrListAddrPtr_)
+        calcAddressing();
+    return *masterProfileToPatchAddrListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const ListListAddr<scalarList>&
+MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+masterPatchToProfileWeightsListAddr() const
+{
+    if (!masterPatchToProfileWeightsListAddrPtr_)
+    {
+        calcAddressing();
+    }
+
+    return *masterPatchToProfileWeightsListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const ListListAddr<scalarList>&
+MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+masterProfileToPatchWeightsListAddr() const
+{
+    if (!masterProfileToPatchWeightsListAddrPtr_)
+    {
+        calcAddressing();
+    }
+
+    return *masterProfileToPatchWeightsListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const Foam::ListListAddr<labelList>&
+Foam::MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+slavePatchToProfileAddrListAddr() const
+{
+    if (!slavePatchToProfileAddrListAddrPtr_)
+        calcAddressing();
+    return *slavePatchToProfileAddrListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const Foam::ListListAddr<labelList>&
+Foam::MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+slaveProfileToPatchAddrListAddr() const
+{
+    if (!slaveProfileToPatchAddrListAddrPtr_)
+        calcAddressing();
+    return *slaveProfileToPatchAddrListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const ListListAddr<scalarList>&
+MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+slavePatchToProfileWeightsListAddr() const
+{
+    if (!slavePatchToProfileWeightsListAddrPtr_)
+    {
+        calcAddressing();
+    }
+
+    return *slavePatchToProfileWeightsListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
+const ListListAddr<scalarList>&
+MixingPlaneInterpolation<MasterPatch, SlavePatch>::
+slaveProfileToPatchWeightsListAddr() const
+{
+    if (!slaveProfileToPatchWeightsListAddrPtr_)
+    {
+        calcAddressing();
+    }
+
+    return *slaveProfileToPatchWeightsListAddrPtr_;
+}
+
+
+template<class MasterPatch, class SlavePatch>
 const tensorField&
 MixingPlaneInterpolation<MasterPatch, SlavePatch>::
 masterPatchToProfileT() const

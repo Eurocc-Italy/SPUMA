@@ -915,10 +915,15 @@ void Foam::mixingPlaneFvPatchField<Type>::updateInterfaceMatrix
 
         scalarField sField(sfc.size());
 
-        forAll (sField, i)
+        foamExecutor exec;
+        auto sFieldPtr = sField.begin();
+        const auto psiInternalPtr = psiInternal.cbegin();
+        const auto sfcPtr = sfc.begin();
+        auto Lambda = [=](label i)
         {
-            sField[i] = psiInternal[sfc[i]];
-        }
+            sFieldPtr[i] = psiInternalPtr[sfcPtr[i]];
+        };
+        exec.parallelFor(Lambda, sField.size());
 
         // Get local faceCells
         const labelUList& fc = mixingPlanePatch_.faceCells();
@@ -986,10 +991,15 @@ void Foam::mixingPlaneFvPatchField<Type>::updateInterfaceMatrix
 
         Field<Type> sField(sfc.size());
 
-        forAll (sField, i)
+        foamExecutor exec;
+        auto sFieldPtr = sField.begin();
+        const auto psiInternalPtr = psiInternal.cbegin();
+        const auto sfcPtr = sfc.begin();
+        auto Lambda = [=](label i)
         {
-            sField[i] = psiInternal[sfc[i]];
-        }
+            sFieldPtr[i] = psiInternalPtr[sfcPtr[i]];
+        };
+        exec.parallelFor(Lambda, sField.size());
 
         // Get local faceCells
         const labelUList& fc = mixingPlanePatch_.faceCells();

@@ -132,6 +132,7 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
 
     switch (wfEvalMethod_)
     {
+        //NOTE: GGI not supported on GPU with current implementation
         case GGI:
         {
             Info << "Selecting GGI for evaluating the mixingPlane weighting factors" << endl;
@@ -394,6 +395,26 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
 
             slaveProfileToPatchWeightsPtr_ =
                 new scalarListList(wShadowToRibbon.srcWeights());
+
+
+            // indirect addressing
+            masterPatchToProfileAddrListAddrPtr_ =
+                new ListListAddr<labelList>(*masterPatchToProfileAddrPtr_);
+            slavePatchToProfileAddrListAddrPtr_ =
+                new ListListAddr<labelList>(*slavePatchToProfileAddrPtr_);
+            masterPatchToProfileWeightsListAddrPtr_ =
+                new ListListAddr<scalarList>(*masterPatchToProfileWeightsPtr_);
+            slavePatchToProfileWeightsListAddrPtr_ =
+                new ListListAddr<scalarList>(*slavePatchToProfileWeightsPtr_);
+
+            masterProfileToPatchAddrListAddrPtr_ =
+                new ListListAddr<labelList>(*masterProfileToPatchAddrPtr_);
+            slaveProfileToPatchAddrListAddrPtr_ =
+                new ListListAddr<labelList>(*slaveProfileToPatchAddrPtr_);
+            masterProfileToPatchWeightsListAddrPtr_ =
+                new ListListAddr<scalarList>(*masterProfileToPatchWeightsPtr_);
+            slaveProfileToPatchWeightsListAddrPtr_ =
+                new ListListAddr<scalarList>(*slaveProfileToPatchWeightsPtr_);
         }
         break;
 
@@ -616,6 +637,17 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::clearAddressing()
     deleteDemandDrivenData(slaveProfileToPatchAddrPtr_);
     deleteDemandDrivenData(slavePatchToProfileWeightsPtr_);
     deleteDemandDrivenData(slaveProfileToPatchWeightsPtr_);
+
+    // indirect addressing
+    deleteDemandDrivenData(slavePatchToProfileAddrListAddrPtr_);
+    deleteDemandDrivenData(slavePatchToProfileWeightsListAddrPtr_);
+    deleteDemandDrivenData(masterPatchToProfileAddrListAddrPtr_);
+    deleteDemandDrivenData(masterPatchToProfileWeightsListAddrPtr_);
+
+    deleteDemandDrivenData(masterProfileToPatchAddrListAddrPtr_);
+    deleteDemandDrivenData(masterProfileToPatchWeightsListAddrPtr_);
+    deleteDemandDrivenData(slaveProfileToPatchAddrListAddrPtr_);
+    deleteDemandDrivenData(slaveProfileToPatchWeightsListAddrPtr_);
 }
 
 

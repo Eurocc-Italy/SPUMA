@@ -135,10 +135,15 @@ Foam::tmp<Foam::Field<Type> > Foam::mixingPlanePolyPatch::toProfile
         // Insert master processor
         const labelList& za = zoneAddressing();
 
-        forAll (za, i)
+        foamExecutor exec;
+        auto expandFieldPtr = expandField.begin();
+        const auto zaPtr = za.cbegin();
+        const auto ffPtr = ff.cbegin();
+        auto Lambda = [=](label i)
         {
-            expandField[za[i]] = ff[i];
-        }
+            expandFieldPtr[zaPtr[i]] = ffPtr[i];
+        };
+        exec.parallelFor(Lambda, za.size());
 
 #ifdef FOAM_EXTEND_PARALLEL
         // Master receives and inserts data from all processors for which

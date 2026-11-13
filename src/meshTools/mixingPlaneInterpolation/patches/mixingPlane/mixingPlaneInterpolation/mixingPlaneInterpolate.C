@@ -109,6 +109,39 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::toProfile
 
 template<class MasterPatch, class SlavePatch>
 template<class Type>
+void MixingPlaneInterpolation<MasterPatch, SlavePatch>::toProfile
+(
+    const Field<Type>& srcF,
+    const labelListList& srcAddr,
+    const scalarListList& srcWeights,
+    const ListListAddr<labelList>& srcAddrListAddr,
+    const ListListAddr<scalarList>& srcWeightsListAddr,
+    Field<Type>& profileBandValues
+)
+{
+    foamExecutor exec;
+
+    auto profileBandValuesPtr = profileBandValues.begin();
+    const auto srcFPtr = srcF.cbegin();
+    const auto srcAddrListAddrSizePtr = srcAddrListAddr.sizes().cbegin();
+    const auto srcAddrListAddrPtrsPtr = srcAddrListAddr.begins().cbegin();
+    const auto srcWeightsListAddrPtrsPtr = srcWeightsListAddr.begins().cbegin();
+
+    auto Lambda = [=](label bandI)
+    {
+        auto srcAddrPtr = srcAddrListAddrPtrsPtr[bandI];
+        auto srcWeightsPtr = srcWeightsListAddrPtrsPtr[bandI];
+        for (label faceI=0; faceI<srcAddrListAddrSizePtr[bandI]; ++faceI)
+        {
+            profileBandValuesPtr[bandI] += srcFPtr[srcAddrPtr[faceI]]*srcWeightsPtr[faceI];
+        }
+    };
+    exec.parallelFor(Lambda,srcAddrListAddr.sizes().size());
+}
+
+
+template<class MasterPatch, class SlavePatch>
+template<class Type>
 void MixingPlaneInterpolation<MasterPatch, SlavePatch>::fromProfile
 (
     const Field<Type>& profileBandValues,
@@ -131,6 +164,44 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::fromProfile
             dstResultF[faceI] += profileBandValues[curAddr[bandI]]*curW[bandI];
         }
     }
+}
+
+template<class MasterPatch, class SlavePatch>
+template<class Type>
+void MixingPlaneInterpolation<MasterPatch, SlavePatch>::fromProfile
+(
+    const Field<Type>& profileBandValues,
+    const labelListList& dstAddr,
+    const scalarListList& dstWeights,
+    const ListListAddr<labelList>& dstAddrListAddr,
+    const ListListAddr<scalarList>& dstWeightsListAddr,
+    Field<Type>& dstResultF
+)
+{
+    // The profile to dst transfer is done by distributing the
+    // average value accordingly to the dst weighting factors
+
+    foamExecutor exec;
+    auto dstResultFPtr = dstResultF.begin();
+    const auto profileBandValuesPtr = profileBandValues.begin();
+    const auto dstAddrListAddrSizesPtr = dstAddrListAddr.sizes().begin();
+    const auto dstAddrListAddrPtrsPtr = dstAddrListAddr.begins().begin();
+    const auto dstWeightsListAddrPtrsPtr = dstWeightsListAddr.begins().begin();
+    const auto localZero = pTraits<Type>::zero;
+
+    auto Lambda = [=] (label faceI)
+    {
+        const auto curAddr = dstAddrListAddrPtrsPtr[faceI];
+        const auto curW = dstWeightsListAddrPtrsPtr[faceI];
+
+        dstResultFPtr[faceI] = localZero;
+
+        for (label bandI=0; bandI<dstAddrListAddrSizesPtr[faceI]; bandI++)
+        {
+            dstResultFPtr[faceI] += profileBandValuesPtr[curAddr[bandI]]*curW[bandI];
+        }
+    };
+    exec.parallelFor(Lambda, dstAddrListAddr.sizes().size());
 }
 
 
@@ -164,6 +235,52 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::maskedFromProfile
     }
 }
 
+template<class MasterPatch, class SlavePatch>
+template<class Type>
+void MixingPlaneInterpolation<MasterPatch, SlavePatch>::maskedFromProfile
+(
+    const Field<Type>& profileBandValues,
+    const labelListList& dstAddr,
+    const scalarListList& dstWeights,
+    const ListListAddr<labelList>& dstAddrListAddr,
+    const ListListAddr<scalarList>& dstWeightsListAddr,
+    Field<Type>& dstResultF,
+    const labelList& mask
+)
+{
+    // The profile to dst transfer is done by distributing the
+    // average value accordingly to the dst weighting factors
+
+    foamExecutor exec;
+    auto dstResultFPtr = dstResultF.begin();
+    const auto maskPtr = mask.cbegin();
+    const auto profileBandValuesPtr = profileBandValues.cbegin();
+
+    const auto dstAddrListAddrSizesPtr = dstAddrListAddr.sizes().begin();
+    const auto dstAddrListAddrPtrsPtr = dstAddrListAddr.begins().begin();
+    const auto dstWeightsListAddrPtrsPtr = dstWeightsListAddr.begins().begin();
+
+    const auto localZero = pTraits<Type>::zero;
+
+    auto Lambda = [=] (label maskI)
+    {
+        // Pick the masked face
+        const label faceI = maskPtr[maskI];
+
+        const auto curAddrPtr = dstAddrListAddrPtrsPtr[faceI];
+        const auto curWPtr = dstWeightsListAddrPtrsPtr[faceI];
+
+        dstResultFPtr[maskI] = localZero;
+
+        for (label bandI=0; bandI<dstAddrListAddrSizesPtr[faceI]; bandI++)
+        {
+            dstResultFPtr[maskI] += profileBandValuesPtr[curAddrPtr[bandI]]*curWPtr[bandI];
+        }
+    };
+    exec.parallelFor(Lambda, mask.size());
+}
+
+
 
 template<class MasterPatch, class SlavePatch>
 template<class Type>
@@ -177,13 +294,19 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::maskedTransform
 {
     // The profile to dst transfer is done by distributing the
     // average value accordingly to the dst weighting factors
-    forAll (mask, maskI)
+    foamExecutor exec;
+    auto transFieldPtr = transField.begin();
+    const auto maskPtr = mask.cbegin();
+    const auto tPtr = t.cbegin();
+    const auto inFieldPtr = inField.cbegin();
+    auto Lambda = [=] (label maskI)
     {
         // Pick the masked face
-        const label faceI = mask[maskI];
+        const label faceI = maskPtr[maskI];
 
-        transField[maskI] = transform(t[faceI], inField[maskI]);
-    }
+        transFieldPtr[maskI] = transform(tPtr[faceI], inFieldPtr[maskI]);
+    };
+    exec.parallelFor(Lambda, mask.size());
 }
 
 
@@ -218,6 +341,49 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::interpolate
         profileBandValues,
         dstAddr,
         dstWeights,
+        dstResultF
+    );
+}
+
+template<class MasterPatch, class SlavePatch>
+template<class Type>
+void MixingPlaneInterpolation<MasterPatch, SlavePatch>::interpolate
+(
+    const Field<Type>& srcF,
+    const labelListList& srcAddr,
+    const scalarListList& srcWeights,
+    const labelListList& dstAddr,
+    const scalarListList& dstWeights,
+    const ListListAddr<labelList>& srcAddrListAddr,
+    const ListListAddr<scalarList>& srcWeightsListAddr,
+    const ListListAddr<labelList>& dstAddrListAddr,
+    const ListListAddr<scalarList>& dstWeightsListAddr,
+    Field<Type>& dstResultF
+) const
+{
+    Field<Type> profileBandValues(nProfileBands(), pTraits<Type>::zero);
+
+    // Interpolate from patch to profile
+    toProfile
+    (
+        srcF,
+        srcAddr,
+        srcWeights,
+        srcAddrListAddr,
+        srcWeightsListAddr,
+        profileBandValues
+    );
+
+    // profileBandValues are now the circumferentially averaged values
+
+    // Collect from profile to patch
+    fromProfile
+    (
+        profileBandValues,
+        dstAddr,
+        dstWeights,
+        dstAddrListAddr,
+        dstWeightsListAddr,
         dstResultF
     );
 }
@@ -267,6 +433,12 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::masterToSlave
         masterPatchToProfileWeights(),
         slaveProfileToPatchAddr(),     // To slave distribute average from
         slaveProfileToPatchWeights(),  // profile to patch
+
+        masterPatchToProfileAddrListAddr(),
+        masterPatchToProfileWeightsListAddr(),
+        slaveProfileToPatchAddrListAddr(),
+        slaveProfileToPatchWeightsListAddr(),
+
         result
     );
 
@@ -333,6 +505,12 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::slaveToMaster
         slavePatchToProfileWeights(),
         masterProfileToPatchAddr(),    // To master: distribute the average
         masterProfileToPatchWeights(),
+
+        slavePatchToProfileAddrListAddr(),
+        slavePatchToProfileWeightsListAddr(),
+        masterProfileToPatchAddrListAddr(),
+        masterProfileToPatchWeightsListAddr(),
+
         result
     );
 
@@ -397,6 +575,8 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::masterToProfile
         profileFF,                      // Master data in 'profile space'
         masterPatchToProfileAddr(),     // From master: compute the average
         masterPatchToProfileWeights(),
+        masterPatchToProfileAddrListAddr(),
+        masterPatchToProfileWeightsListAddr(),
         result
     );
 
@@ -457,6 +637,8 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::slaveToProfile
         profileFF,                     // Slave data in 'profile space'
         slavePatchToProfileAddr(),     // From slave: compute the average
         slavePatchToProfileWeights(),
+        slavePatchToProfileAddrListAddr(),
+        slavePatchToProfileWeightsListAddr(),
         result
     );
 
@@ -514,6 +696,8 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::profileToMaster
         profileFF,                      // Master data in 'profile space'
         masterProfileToPatchAddr(),     // To master: distribute the average
         masterProfileToPatchWeights(),
+        masterProfileToPatchAddrListAddr(),
+        masterProfileToPatchWeightsListAddr(),
         result
     );
 
@@ -572,6 +756,8 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::maskedProfileToMaster
         profileFF,                      // Master data in 'profile space'
         masterProfileToPatchAddr(),     // To master: distribute the average
         masterProfileToPatchWeights(),
+        masterProfileToPatchAddrListAddr(),
+        masterProfileToPatchWeightsListAddr(),
         result,
         mask
     );
@@ -618,6 +804,8 @@ MixingPlaneInterpolation<MasterPatch, SlavePatch>::profileToSlave
         profileFF,                     // Slave data in 'profile space'
         slaveProfileToPatchAddr(),     // To slave distribute average from
         slaveProfileToPatchWeights(),  // profile to patch
+        slaveProfileToPatchAddrListAddr(),
+        slaveProfileToPatchWeightsListAddr(),
         result
     );
 
@@ -675,6 +863,8 @@ void MixingPlaneInterpolation<MasterPatch, SlavePatch>::maskedProfileToSlave
         profileFF,                     // Slave data in 'profile space'
         slaveProfileToPatchAddr(),     // To slave distribute average from
         slaveProfileToPatchWeights(),  // profile to patch
+        slaveProfileToPatchAddrListAddr(),
+        slaveProfileToPatchWeightsListAddr(),
         result,
         mask
     );
