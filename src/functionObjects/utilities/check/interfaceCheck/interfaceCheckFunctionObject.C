@@ -50,7 +50,7 @@ Author
 
 #include "interfaceCheckFunctionObject.H"
 #include "addToRunTimeSelectionTable.H"
-// #include "mixingPlaneFvsPatchFields.H"
+#include "mixingPlaneFvsPatchFields.H"
 #include "overlapAMIFvsPatchFields.H"
 // #include "ggiFvsPatchFields.H"
 #include "cyclicAMIFvsPatchFields.H"
@@ -147,7 +147,7 @@ bool Foam::functionObjects::interfaceCheckFunctionObject::execute()
                 visited[masterPatchI] = true;
                 visited[neighbourPatchI] = true;
             }*/
-            /*else if (isA<mixingPlaneFvsPatchScalarField>(phi.boundaryField()[patchI]))
+            else if (isA<mixingPlaneFvsPatchScalarField>(phi.boundaryField()[patchI]))
             {
                 const mixingPlanePolyPatch& mixingPlanePatch =
                     refCast<const mixingPlanePolyPatch>
@@ -163,7 +163,7 @@ bool Foam::functionObjects::interfaceCheckFunctionObject::execute()
 
                 visited[masterPatchI] = true;
                 visited[neighbourPatchI] = true;
-            }*/
+            }
             else if (isA<overlapAMIFvsPatchScalarField>(phi.boundaryField()[patchI]))
             {
                 const overlapAMIPolyPatch& overlapAMIPatch =
