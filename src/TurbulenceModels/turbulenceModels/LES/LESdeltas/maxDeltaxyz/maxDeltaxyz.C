@@ -27,6 +27,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "maxDeltaxyz.H"
+#include "executors.H"
 #include "addToRunTimeSelectionTable.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -49,23 +50,29 @@ void Foam::LESModels::maxDeltaxyz::calcDelta()
 
     label nD = mesh.nGeometricD();
 
-    const cellList& cells = mesh.cells();
+    const auto cellFaceStart = mesh.cellsFaceStart().cbegin();
+    const auto cellFaces = mesh.cellsFaces().cbegin();
     const vectorField& cellC = mesh.cellCentres();
     const vectorField& faceC = mesh.faceCentres();
     const vectorField faceN(mesh.faceAreas()/mag(mesh.faceAreas()));
-    scalarField hmax(cells.size());
+    scalarField hmax(mesh.nCells());
 
-    forAll(cells, celli)
+    const auto cellCp = cellC.cbegin();
+    const auto faceCp = faceC.cbegin();
+    const auto faceNp = faceN.cbegin();
+    auto hmaxp = hmax.begin();
+    const scalar deltaCoeff = deltaCoeff_;
+    foamExecutor exec;
+    auto calculate = [=](label celli)
     {
         scalar deltaMaxTmp = 0.0;
-        const labelList& cFaces = cells[celli];
-        const point& cc = cellC[celli];
+        const point& cc = cellCp[celli];
 
-        forAll(cFaces, cFacei)
+        for (label i = cellFaceStart[celli]; i < cellFaceStart[celli+1]; ++i)
         {
-            label facei = cFaces[cFacei];
-            const point& fc = faceC[facei];
-            const vector& n = faceN[facei];
+            label facei = cellFaces[i];
+            const point& fc = faceCp[facei];
+            const vector& n = faceNp[facei];
 
             scalar tmp = mag(n & (fc - cc));
             if (tmp > deltaMaxTmp)
@@ -74,8 +81,9 @@ void Foam::LESModels::maxDeltaxyz::calcDelta()
             }
         }
 
-        hmax[celli] = deltaCoeff_*deltaMaxTmp;
-    }
+        hmaxp[celli] = deltaCoeff*deltaMaxTmp;
+    };
+    exec.parallelFor(calculate, mesh.nCells());
 
     if (nD == 3)
     {
