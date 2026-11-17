@@ -237,11 +237,21 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
 
     label maxIter = 0;
 
-    forAll(ReThetat0, celli)
+    foamExecutor exec;
+    auto ReThetat0p = ReThetat0.begin();
+    const auto kp = k.primitiveField().cbegin();
+    const auto Usp = Us.cbegin();
+    const auto dUsdsp = dUsds.cbegin();
+    const auto nup = nu.cbegin();
+    const scalar lambdaTolerance = lambdaErr_;
+
+    // Each cell converges independently. Reduce only the iteration count
+    // needed by the existing host-side diagnostic.
+    auto calculate = [=](label celli)
     {
         const scalar Tu
         (
-            max(100*sqrt((2.0/3.0)*k[celli])/Us[celli], scalar(0.027))
+            max(100*sqrt((2.0/3.0)*kp[celli])/Usp[celli], scalar(0.027))
         );
 
         // Initialize lambda to zero.
@@ -261,7 +271,7 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
             if (Tu <= 1.3)
             {
                 const scalar Flambda =
-                    dUsds[celli] <= 0
+                    dUsdsp[celli] <= 0
                   ?
                     1
                   - (
@@ -276,13 +286,13 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
 
                 thetat =
                     (1173.51 - 589.428*Tu + 0.2196/sqr(Tu))
-                   *Flambda*nu[celli]
-                   /Us[celli];
+                   *Flambda*nup[celli]
+                   /Usp[celli];
             }
             else
             {
                 const scalar Flambda =
-                    dUsds[celli] <= 0
+                    dUsdsp[celli] <= 0
                   ?
                     1
                   - (
@@ -297,20 +307,26 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
 
                 thetat =
                     331.50*pow((Tu - 0.5658), -0.671)
-                   *Flambda*nu[celli]/Us[celli];
+                   *Flambda*nup[celli]/Usp[celli];
             }
 
-            lambda = sqr(thetat)/nu[celli]*dUsds[celli];
+            lambda = sqr(thetat)/nup[celli]*dUsdsp[celli];
             lambda = clamp(lambda, scalar(-0.1), scalar(0.1));
 
             lambdaErr = mag(lambda - lambda0);
 
-            maxIter = max(maxIter, ++iter);
+            ++iter;
 
-        } while (lambdaErr > lambdaErr_);
+        } while (lambdaErr > lambdaTolerance);
 
-        ReThetat0[celli] = max(thetat*Us[celli]/nu[celli], scalar(20));
-    }
+        ReThetat0p[celli] = max(thetat*Usp[celli]/nup[celli], scalar(20));
+        return iter;
+    };
+    auto maxIterations = [](label a, label b) { return max(a, b); };
+    exec.reductionCompare
+    (
+        calculate, maxIterations, &maxIter, ReThetat0.size()
+    );
 
     if (maxIter > maxLambdaIter_)
     {
