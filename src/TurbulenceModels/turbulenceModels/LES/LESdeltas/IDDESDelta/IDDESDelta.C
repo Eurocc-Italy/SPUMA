@@ -27,6 +27,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "IDDESDelta.H"
+#include "executors.H"
 #include "addToRunTimeSelectionTable.H"
 #include "wallDist.H"
 #include "maxDeltaxyz.H"
@@ -63,24 +64,28 @@ void Foam::LESModels::IDDESDelta::calcDelta()
 
     scalarField& faceToFacenMax = tfaceToFacenMax.ref().primitiveFieldRef();
 
-    const cellList& cells = mesh.cells();
+    const auto cellFaceStart = mesh.cellsFaceStart().cbegin();
+    const auto cellFaces = mesh.cellsFaces().cbegin();
     const vectorField& faceCentres = mesh.faceCentres();
 
-    forAll(cells, celli)
+    const auto faceCentresp = faceCentres.cbegin();
+    const auto np = n.primitiveField().cbegin();
+    auto faceToFacenMaxp = faceToFacenMax.begin();
+    foamExecutor exec;
+    auto calculate = [=](label celli)
     {
         scalar maxDelta = 0.0;
-        const labelList& cFaces = cells[celli];
-        const vector nci = n[celli];
+        const vector nci = np[celli];
 
-        forAll(cFaces, cFacei)
+        for (label i = cellFaceStart[celli]; i < cellFaceStart[celli+1]; ++i)
         {
-            label facei = cFaces[cFacei];
-            const point& fci = faceCentres[facei];
+            label facei = cellFaces[i];
+            const point& fci = faceCentresp[facei];
 
-            forAll(cFaces, cFacej)
+            for (label j = cellFaceStart[celli]; j < cellFaceStart[celli+1]; ++j)
             {
-                label facej = cFaces[cFacej];
-                const point& fcj = faceCentres[facej];
+                label facej = cellFaces[j];
+                const point& fcj = faceCentresp[facej];
                 scalar ndfc = nci & (fcj - fci);
 
                 if (ndfc > maxDelta)
@@ -90,9 +95,9 @@ void Foam::LESModels::IDDESDelta::calcDelta()
             }
         }
 
-        faceToFacenMax[celli] = maxDelta;
-    }
-
+        faceToFacenMaxp[celli] = maxDelta;
+    };
+    exec.parallelFor(calculate, mesh.nCells());
 
     label nD = mesh.nGeometricD();
 

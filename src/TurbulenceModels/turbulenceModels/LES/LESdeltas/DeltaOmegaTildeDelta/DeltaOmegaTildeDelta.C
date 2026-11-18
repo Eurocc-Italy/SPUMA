@@ -27,6 +27,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "DeltaOmegaTildeDelta.H"
+#include "executors.H"
 #include "fvcCurl.H"
 #include "maxDeltaxyz.H"
 #include "addToRunTimeSelectionTable.H"
@@ -65,21 +66,28 @@ void Foam::LESModels::DeltaOmegaTildeDelta::calcDelta()
     );
     tvorticity.clear();
 
-    const cellList& cells = mesh.cells();
+    const auto cellFaceStart = mesh.cellsFaceStart().cbegin();
+    const auto cellFaces = mesh.cellsFaces().cbegin();
     const vectorField& cellCentres = mesh.cellCentres();
     const vectorField& faceCentres = mesh.faceCentres();
 
-    forAll(cells, celli)
+    const auto cellCentresp = cellCentres.cbegin();
+    const auto faceCentresp = faceCentres.cbegin();
+    const auto nvecvortp = nvecvort.primitiveField().cbegin();
+    auto deltap = delta_.primitiveFieldRef().begin();
+    const scalar deltaCoeff = deltaCoeff_;
+    foamExecutor exec;
+    auto calculate = [=](label celli)
     {
-        const labelList& cFaces = cells[celli];
-        const point& cc = cellCentres[celli];
-        const vector& nv = nvecvort[celli];
+        const point& cc = cellCentresp[celli];
+        const vector& nv = nvecvortp[celli];
 
         scalar deltaMaxTmp = 0;
 
-        for (const label facei : cFaces)
+        for (label i = cellFaceStart[celli]; i < cellFaceStart[celli+1]; ++i)
         {
-            const point& fc = faceCentres[facei];
+            const label facei = cellFaces[i];
+            const point& fc = faceCentresp[facei];
             const scalar tmp = 2.0*mag(nv ^ (fc - cc));
 
             if (tmp > deltaMaxTmp)
@@ -88,8 +96,9 @@ void Foam::LESModels::DeltaOmegaTildeDelta::calcDelta()
             }
         }
 
-        delta_[celli] = deltaCoeff_*deltaMaxTmp;
-    }
+        deltap[celli] = deltaCoeff*deltaMaxTmp;
+    };
+    exec.parallelFor(calculate, mesh.nCells());
 
     const label nD = mesh.nGeometricD();
 

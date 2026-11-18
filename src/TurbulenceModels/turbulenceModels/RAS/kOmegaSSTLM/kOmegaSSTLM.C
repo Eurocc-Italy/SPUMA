@@ -29,6 +29,7 @@ License
 #include "kOmegaSSTLM.H"
 #include "fvOptions.H"
 #include "bound.H"
+#include "executors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -127,11 +128,14 @@ kOmegaSSTLM<BasicTurbulenceModel>::ReThetac() const
     );
     auto& ReThetac = tReThetac.ref();
 
-    forAll(ReThetac, celli)
+    foamExecutor exec;
+    auto ReThetacp = ReThetac.begin();
+    const auto ReThetatp = ReThetat_.primitiveField().cbegin();
+    auto calculate = [=](label celli)
     {
-        const scalar ReThetat = ReThetat_[celli];
+        const scalar ReThetat = ReThetatp[celli];
 
-        ReThetac[celli] =
+        ReThetacp[celli] =
             ReThetat <= 1870
           ?
             ReThetat
@@ -142,7 +146,8 @@ kOmegaSSTLM<BasicTurbulenceModel>::ReThetac() const
           - 174.105e-12*pow4(ReThetat)
           :
             ReThetat - 593.11 - 0.482*(ReThetat - 1870);
-    }
+    };
+    exec.parallelFor(calculate, ReThetac.size());
 
     return tReThetac;
 }
@@ -166,20 +171,26 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::Flength
     const volScalarField::Internal& omega = this->omega_();
     const volScalarField::Internal& y = this->y_();
 
-    forAll(ReThetat_, celli)
+    foamExecutor exec;
+    auto Flengthp = Flength.begin();
+    const auto ReThetatp = ReThetat_.primitiveField().cbegin();
+    const auto omegap = omega.cbegin();
+    const auto yp = y.cbegin();
+    const auto nup = nu.cbegin();
+    auto calculate = [=](label celli)
     {
-        const scalar ReThetat = ReThetat_[celli];
+        const scalar ReThetat = ReThetatp[celli];
 
         if (ReThetat < 400)
         {
-            Flength[celli] =
+            Flengthp[celli] =
                 398.189e-1
               - 119.270e-4*ReThetat
               - 132.567e-6*sqr(ReThetat);
         }
         else if (ReThetat < 596)
         {
-            Flength[celli] =
+            Flengthp[celli] =
                 263.404
               - 123.939e-2*ReThetat
               + 194.548e-5*sqr(ReThetat)
@@ -187,18 +198,19 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::Flength
         }
         else if (ReThetat < 1200)
         {
-            Flength[celli] = 0.5 - 3e-4*(ReThetat - 596);
+            Flengthp[celli] = 0.5 - 3e-4*(ReThetat - 596);
         }
         else
         {
-            Flength[celli] = 0.3188;
+            Flengthp[celli] = 0.3188;
         }
 
         const scalar Fsublayer =
-            exp(-sqr(sqr(y[celli])*omega[celli]/(200*nu[celli])));
+            exp(-sqr(sqr(yp[celli])*omegap[celli]/(200*nup[celli])));
 
-        Flength[celli] = Flength[celli]*(1 - Fsublayer) + 40*Fsublayer;
-    }
+        Flengthp[celli] = Flengthp[celli]*(1 - Fsublayer) + 40*Fsublayer;
+    };
+    exec.parallelFor(calculate, Flength.size());
 
     return tFlength;
 }
@@ -225,11 +237,21 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
 
     label maxIter = 0;
 
-    forAll(ReThetat0, celli)
+    foamExecutor exec;
+    auto ReThetat0p = ReThetat0.begin();
+    const auto kp = k.primitiveField().cbegin();
+    const auto Usp = Us.cbegin();
+    const auto dUsdsp = dUsds.cbegin();
+    const auto nup = nu.cbegin();
+    const scalar lambdaTolerance = lambdaErr_;
+
+    // Each cell converges independently. Reduce only the iteration count
+    // needed by the existing host-side diagnostic.
+    auto calculate = [=](label celli)
     {
         const scalar Tu
         (
-            max(100*sqrt((2.0/3.0)*k[celli])/Us[celli], scalar(0.027))
+            max(100*sqrt((2.0/3.0)*kp[celli])/Usp[celli], scalar(0.027))
         );
 
         // Initialize lambda to zero.
@@ -249,7 +271,7 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
             if (Tu <= 1.3)
             {
                 const scalar Flambda =
-                    dUsds[celli] <= 0
+                    dUsdsp[celli] <= 0
                   ?
                     1
                   - (
@@ -264,13 +286,13 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
 
                 thetat =
                     (1173.51 - 589.428*Tu + 0.2196/sqr(Tu))
-                   *Flambda*nu[celli]
-                   /Us[celli];
+                   *Flambda*nup[celli]
+                   /Usp[celli];
             }
             else
             {
                 const scalar Flambda =
-                    dUsds[celli] <= 0
+                    dUsdsp[celli] <= 0
                   ?
                     1
                   - (
@@ -285,20 +307,26 @@ tmp<volScalarField::Internal> kOmegaSSTLM<BasicTurbulenceModel>::ReThetat0
 
                 thetat =
                     331.50*pow((Tu - 0.5658), -0.671)
-                   *Flambda*nu[celli]/Us[celli];
+                   *Flambda*nup[celli]/Usp[celli];
             }
 
-            lambda = sqr(thetat)/nu[celli]*dUsds[celli];
+            lambda = sqr(thetat)/nup[celli]*dUsdsp[celli];
             lambda = clamp(lambda, scalar(-0.1), scalar(0.1));
 
             lambdaErr = mag(lambda - lambda0);
 
-            maxIter = max(maxIter, ++iter);
+            ++iter;
 
-        } while (lambdaErr > lambdaErr_);
+        } while (lambdaErr > lambdaTolerance);
 
-        ReThetat0[celli] = max(thetat*Us[celli]/nu[celli], scalar(20));
-    }
+        ReThetat0p[celli] = max(thetat*Usp[celli]/nup[celli], scalar(20));
+        return iter;
+    };
+    auto maxIterations = [](label a, label b) { return max(a, b); };
+    exec.reductionCompare
+    (
+        calculate, maxIterations, &maxIter, ReThetat0.size()
+    );
 
     if (maxIter > maxLambdaIter_)
     {
