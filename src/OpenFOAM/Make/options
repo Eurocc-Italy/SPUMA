@@ -47,3 +47,14 @@ ifneq (,$(findstring true,$(have_hip)))
     EXE_INC += -Dhave_hip
 endif
 
+/*
+    Added: SVE SELL kernels in SELLMatrixATmul.C, aarch64 CPU builds only,
+    double precision and 32-bit labels (what the kernels take).
+    LOOP_UNROLLING_FACTOR_G (environment, 1, 2 or 4; default 2) the only kernel variant compiled.
+*/
+ifeq ($(WM_ARCH)$(WM_PRECISION_OPTION)$(WM_LABEL_OPTION),linuxARM64DPInt32)
+ifeq (,$(findstring true,$(have_cuda)$(have_hip)))
+    LOOP_UNROLLING_FACTOR_G ?= 2
+    EXE_INC  += -DSPUMA_SELL_SVE -DLOOP_UNROLLING_FACTOR_G=$(LOOP_UNROLLING_FACTOR_G)
+endif
+endif

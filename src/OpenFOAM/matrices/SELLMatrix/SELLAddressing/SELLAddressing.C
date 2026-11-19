@@ -210,6 +210,25 @@ void Foam::SELLAddressing::calcAddr(const lduAddressing& addr) const
         }
     }
 
+    /*  Added */
+    // in SVE kernels we use uint32_t boff[] = col[]*8, UINT32_MAX on padding, for the gather
+    #ifdef SPUMA_SELL_SVE
+    if (nCells >= label(1 << 29)) // safety check: 2^29 = 536870912, max uint32_t is 2^32-1 = 4294967295
+    {
+        FatalErrorInFunction
+            << "SELL byte offsets are uint32_t: " << nCells
+            << " rows exceed 536870911" << abort(FatalError);
+    }
+    boff_.resize(numEntries_);
+    for (label i = 0; i < numEntries_; ++i)
+    {
+        boff_[i] = (cols[i] == INT32_MAX)
+            ? UINT32_MAX                                    // padding sentinel
+            : uint32_t(cols[i])*uint32_t(sizeof(double));   // col*8 (SVE gather takes byte offsets)
+    }
+    #endif
+    /* /Added */
+
     printInfo(addr);
 }
 
@@ -225,6 +244,7 @@ void Foam::SELLAddressing::clearOut()
     sliceBeginsPtr_.reset(nullptr);
     sliceWidthsPtr_.reset(nullptr);
     colsPtr_.reset(nullptr);
+    std::vector<uint32_t>().swap(boff_);    // Added: frees the storage of boff_
 }
 
 

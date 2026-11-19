@@ -54,6 +54,11 @@ SourceFiles
 #include "Tuple2.H"
 #include "lduAddressing.H"
 
+/*  Added */
+#include <cstdint>
+#include <vector>
+/* /Added */
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
@@ -101,6 +106,11 @@ public:
 
         //- Packed SELL column indices, padded with INT32_MAX
         mutable std::unique_ptr<labelList> colsPtr_;
+
+        /*  Added */
+        // Column byte offsets for the SVE kernels boff[] = col[]*8.
+        mutable std::vector<uint32_t> boff_;
+        /* /Added */
 
 
     // Private Member Functions
@@ -168,6 +178,14 @@ public:
         {
             return *colsPtr_;
         }
+
+        /*  Added */
+        // (Accessor)
+        const std::vector<uint32_t>& boff() const noexcept
+        {
+            return boff_;   // access byte offsets for SVE kernels (SELLMatrixATmul.C)
+        }
+        /* /Added */
 
         //- Return lowerToSELL
         const labelUList& lowerToSELL() const
