@@ -32,6 +32,7 @@ License
 #include "GAMGSolver.H"
 #include "SubField.H"
 #include "PrecisionAdaptor.H"
+#include "gamgTimers.H"     // Added: gv_* timers (timers/)
 #include "SELLMatrix.H"
 #include "lduMatrixConverter.H"
 
@@ -52,15 +53,20 @@ Foam::solverPerformance Foam::GAMGSolver::solve
     // Setup class containing solver performance data
     solverPerformance solverPerf(typeName, fieldName_);
 
+    GV_TIMER(tSolve, "solve");     // Added: the whole solve()
+
     // Calculate A.psi used to calculate the initial residual
     solveScalarField Apsi(psi.size());
-    if (cmatrix_)
     {
-        (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-    }
-    else
-    {
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        GV_TIMER(t, "amul0");     // Added
+        if (cmatrix_)
+        {
+            (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
+        else
+        {
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
     }
 
     // Create the storage for the finestCorrection which may be used as a
@@ -68,8 +74,10 @@ Foam::solverPerformance Foam::GAMGSolver::solve
     solveScalarField finestCorrection(psi.size());
 
     // Calculate normalisation factor
+    GV_TIMER(tNorm, "norm_factor");     // Added
     solveScalar normFactor =
         this->normFactor(psi, tsource(), Apsi, finestCorrection);
+    tNorm.stop();     // Added
 
     if ((log_ >= 2) || (debug >= 2))
     {
@@ -77,6 +85,7 @@ Foam::solverPerformance Foam::GAMGSolver::solve
     }
 
     // Calculate initial finest-grid residual field
+    GV_TIMER(tInit, "init_resid");     // Added: up to the initial residual norm
     solveScalarField finestResidual(tsource() - Apsi);
 
     matrix().setResidualField
@@ -93,6 +102,7 @@ Foam::solverPerformance Foam::GAMGSolver::solve
         matrix().mesh().comm()
     )/normFactor;
     solverPerf.finalResidual() = solverPerf.initialResidual();
+    tInit.stop();     // Added
 
 
     // Check convergence, solve if not converged
@@ -117,17 +127,21 @@ Foam::solverPerformance Foam::GAMGSolver::solve
         solveScalarField scratch2;
 
         // Initialise the above data structures
-        initVcycle
-        (
-            coarseCorrFields,
-            coarseSources,
-            smoothers,
-            scratch1,
-            scratch2
-        );
+        {
+            GV_TIMER(t, "init_vcycle");     // Added: smoothers + SELL of the coarse levels
+            initVcycle
+            (
+                coarseCorrFields,
+                coarseSources,
+                smoothers,
+                scratch1,
+                scratch2
+            );
+        }
 
         do
         {
+            GV_TIMER(tVcycle, "vcycle");     // Added
             Vcycle
             (
                 smoothers,
@@ -144,8 +158,10 @@ Foam::solverPerformance Foam::GAMGSolver::solve
                 coarseSources,
                 cmpt
             );
+            tVcycle.stop();     // Added
 
             // Calculate finest level residual field
+            GV_TIMER(tConvAmul, "conv_amul");     // Added: b - A psi, one residual() call
             if (cmatrix_)
             {
                 (*cmatrix_).residual
@@ -171,11 +187,15 @@ Foam::solverPerformance Foam::GAMGSolver::solve
                 );
             }
 
+            tConvAmul.stop();     // Added
+
+            GV_TIMER(tConvNorm, "conv_norm");     // Added
             solverPerf.finalResidual() = gSumMag
             (
                 finestResidual,
                 matrix().mesh().comm()
             )/normFactor;
+            tConvNorm.stop();     // Added
 
             if ((log_ >= 2) || (debug >= 2))
             {
@@ -191,12 +211,14 @@ Foam::solverPerformance Foam::GAMGSolver::solve
         );
     }
 
+    GV_TIMER(tSetResid, "set_residual");     // Added
     matrix().setResidualField
     (
         ConstPrecisionAdaptor<scalar, solveScalar>(finestResidual)(),
         fieldName_,
         false
     );
+    tSetResid.stop();     // Added
 
     return solverPerf;
 }
@@ -224,7 +246,10 @@ void Foam::GAMGSolver::Vcycle
     const label coarsestLevel = matrixLevels_.size() - 1;
 
     // Restrict finest grid residual for the next level up.
-    agglomeration_.restrictField(coarseSources[0], finestResidual, 0, true);
+    {
+        GV_TIMER_LEVEL(t, "restrict", finestResidual.size());     // Added
+        agglomeration_.restrictField(coarseSources[0], finestResidual, 0, true);
+    }
 
     if (nPreSweeps_ && ((log_ >= 2) || (debug >= 2)))
     {
@@ -298,13 +323,16 @@ void Foam::GAMGSolver::Vcycle
             }
 
             // Residual is equal to source
-            agglomeration_.restrictField
-            (
-                coarseSources[leveli + 1],
-                coarseSources[leveli],
-                leveli + 1,
-                true
-            );
+            {
+                GV_TIMER_LEVEL(t, "restrict", coarseSources[leveli].size());     // Added
+                agglomeration_.restrictField
+                (
+                    coarseSources[leveli + 1],
+                    coarseSources[leveli],
+                    leveli + 1,
+                    true
+                );
+            }
         }
     }
 
@@ -317,6 +345,7 @@ void Foam::GAMGSolver::Vcycle
     // Solve Coarsest level with either an iterative or direct solver
     if (coarseCorrFields.set(coarsestLevel))
     {
+        GV_TIMER(tCoarsest, "coarsest");     // Added
         solveCoarsestLevel
         (
             coarseCorrFields[coarsestLevel],
@@ -359,6 +388,7 @@ void Foam::GAMGSolver::Vcycle
 
 
             // Prolong correction to leveli
+            GV_TIMER_LEVEL(tProlong, "prolong", coarseCorrFields[leveli].size());     // Added
             const auto& cf = agglomeration_.prolongField
             (
                 coarseCorrFields[leveli],   // current level
@@ -370,6 +400,7 @@ void Foam::GAMGSolver::Vcycle
                 ),
                 leveli + 1
             );
+            tProlong.stop();     // Added
 
 
             // Create A.psi for this coarse level as a sub-field of Apsi
@@ -443,13 +474,16 @@ void Foam::GAMGSolver::Vcycle
     }
 
     // Prolong the finest level correction
-    agglomeration_.prolongField
-    (
-        finestCorrection,
-        coarseCorrFields[0],
-        0,
-        true
-    );
+    {
+        GV_TIMER_LEVEL(t, "prolong", finestCorrection.size());     // Added
+        agglomeration_.prolongField
+        (
+            finestCorrection,
+            coarseCorrFields[0],
+            0,
+            true
+        );
+    }
 
     if (interpolateCorrection_)
     {
@@ -490,7 +524,10 @@ void Foam::GAMGSolver::Vcycle
     {
         psiPtr[celli] += finestCorrectionPtr[celli];
     };
-    exec.parallelFor(Lambda, nCells);
+    {
+        GV_TIMER(t, "psi_update");     // Added
+        exec.parallelFor(Lambda, nCells);
+    }
 
     smoothers[0].smooth
     (

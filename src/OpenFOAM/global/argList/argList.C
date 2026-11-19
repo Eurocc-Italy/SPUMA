@@ -49,6 +49,7 @@ License
 #include "fileOperation.H"
 #include "fileOperationInitialise.H"
 #include "Field.H"  // Ugly handling of localBoundaryConsistency switches
+#include "gamgProfiling.H"  // Added: -gamg_profiling (GAMG region timers)
 
 #include <cctype>
 
@@ -120,6 +121,16 @@ Foam::argList::initValidTables::initValidTables()
         "name=val",
         "Set named OptimisationSwitch (default value: 1).\n"
         "[Can be used multiple times]",
+        true  // advanced option
+    );
+
+    // Added: GAMG region timers (GAMG/timers/gamgTimers.H), on by default
+    argList::addOption
+    (
+        "gamg_profiling",
+        "bool",
+        "Record the GAMG region timers and write profiling_results*.csv"
+        " (default: yes)",
         true  // advanced option
     );
 
@@ -1184,6 +1195,22 @@ Foam::argList::argList
                     DetailInfo << "opt-switch ";
                     debug::optimisationObjects()
                         .setNamedValue(args_[argi], 1, true, true);  // dryrun
+                }
+                else if (strcmp(optName, "gamg_profiling") == 0)
+                {
+                    // Added: the '-gamg_profiling' option (yes/no/on/off/...)
+                    const Switch sw(Switch::find(args_[argi]));
+                    if (!sw.good())
+                    {
+                        Info<< nl
+                            << "Error: option '-gamg_profiling' expects a bool"
+                            << " (yes/no, on/off, true/false), not '"
+                            << args_[argi] << "'" << nl << nl;
+
+                        UPstream::exit(1);  // works for serial and parallel
+                    }
+                    gv::enabled = sw;
+                    options_.set(optName, args_[argi]);
                 }
                 else
                 {

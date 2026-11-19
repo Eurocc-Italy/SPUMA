@@ -29,6 +29,7 @@ License
 
 #include "GAMGSolver.H"
 #include "FixedList.H"
+#include "gamgTimers.H"     // Added: gv_* timers (timers/)
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -44,27 +45,31 @@ void Foam::GAMGSolver::scale
     const direction cmpt
 ) const
 {
-    if (cmatrix)
+    GV_TIMER_LEVEL(tScale, "scale", field.size());     // Added: the whole scale()
     {
-        (*cmatrix).Amul
-        (
-            Acf,
-            field,
-            interfaceLevelBouCoeffs,
-            interfaceLevel,
-            cmpt
-        );
-    }
-    else
-    {
-        A.Amul
-        (
-            Acf,
-            field,
-            interfaceLevelBouCoeffs,
-            interfaceLevel,
-            cmpt
-        );
+        GV_TIMER_LEVEL(tAmul, "scale_amul", field.size());     // Added
+        if (cmatrix)
+        {
+            (*cmatrix).Amul
+            (
+                Acf,
+                field,
+                interfaceLevelBouCoeffs,
+                interfaceLevel,
+                cmpt
+            );
+        }
+        else
+        {
+            A.Amul
+            (
+                Acf,
+                field,
+                interfaceLevelBouCoeffs,
+                interfaceLevel,
+                cmpt
+            );
+        }
     }
 
     const label nCells = field.size();

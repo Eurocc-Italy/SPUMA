@@ -35,6 +35,7 @@ License
 #include "Time.H"
 #include "meshState.H"
 #include "lduMatrix.H"
+#include "gamgTimers.H"     // Added: gv_* timers (GAMG/timers/)
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -54,6 +55,8 @@ Foam::SELLMatrix::SELLMatrix
     lduMesh_(A.mesh()),
     lduMatrix_(A)
 {
+    GV_TIMER_LEVEL(tConversion, "conversion", A.diag().size());     // Added: LDU to SELL, per level
+
     const SELLAddressing& addr = SELLAddr();
 
     valuesPtr_ = std::make_unique<scalarField>(addr.numEntries(), Foam::zero{});

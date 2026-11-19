@@ -30,6 +30,7 @@ License
 #include "GAMGInterface.H"
 #include "PCG.H"
 #include "PBiCGStab.H"
+#include "gamgTimers.H"     // Added: gv_* timers (timers/)
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -90,6 +91,7 @@ Foam::GAMGSolver::GAMGSolver
     interfaceLevelsBouCoeffs_(agglomeration_.size()),
     interfaceLevelsIntCoeffs_(agglomeration_.size())
 {
+    GV_TIMER(tConstruct, "construct");     // Added: coarse matrices (agglomeration)
     readControls();
 
     if (agglomeration_.processorAgglomerate())

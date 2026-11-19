@@ -31,6 +31,7 @@ License
 #include "PrecisionAdaptor.H"
 #include "diagonalPreconditioner.H"
 #include "l1diagonalPreconditioner.H"
+#include "gamgTimers.H"     // Added: gv_* timers (GAMG/timers/)
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -120,6 +121,8 @@ void Foam::RichardsonSmoother::smooth_
     const label nCells = psi.size();
     const scalar omega = this->omega_;
 
+    GV_TIMER_LEVEL(tSmooth, "smooth", nCells);     // Added: the whole smoother
+
     solveScalarField Apsi(nCells);
     const solveScalar* const __restrict__ ApsiPtr = Apsi.cbegin();
 
@@ -134,13 +137,16 @@ void Foam::RichardsonSmoother::smooth_
     for (label sweep=0; sweep<nSweeps; sweep++)
     {
         // --- Calculate A.psi
-        if (cmatrix_)
         {
-            (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-        }
-        else
-        {
-            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            GV_TIMER_LEVEL(tAmul, "smooth_amul", nCells);     // Added
+            if (cmatrix_)
+            {
+                (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
+            else
+            {
+                matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
         }
 
         auto LambdaUpdatePsi = [=](label celli)

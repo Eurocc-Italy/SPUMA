@@ -29,6 +29,7 @@ License
 
 #include "twoStageGaussSeidelSmoother.H"
 #include "PrecisionAdaptor.H"
+#include "gamgTimers.H"     // Added: gv_* timers (GAMG/timers/)
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -113,6 +114,7 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
     const solveScalar* const __restrict__ bPtr = source.cbegin();
 
     const label nCells = psi.size();
+    GV_TIMER_LEVEL(tSmooth, "smooth", nCells);     // Added: the whole smoother
     const label nInternalFaces = matrix_.upper().size();
 
     const scalar* const __restrict__ diagPtr = matrix_.diag().cbegin();
@@ -147,13 +149,16 @@ void Foam::twoStageGaussSeidelSmoother::smooth_
         // -- Compute new residual vector (scaled by D^-1)
 
         // --- Calculate A.psi (we use rDr as auxiliary field)
-        if (cmatrix_)
         {
-            (*cmatrix_).Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-        }
-        else
-        {
-            matrix_.Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            GV_TIMER_LEVEL(tAmul, "smooth_amul", nCells);     // Added
+            if (cmatrix_)
+            {
+                (*cmatrix_).Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
+            else
+            {
+                matrix_.Amul(rDr, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
         }
 
         // --- Calculate rDr = D^-1 * rA

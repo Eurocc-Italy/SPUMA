@@ -34,6 +34,7 @@ License
 #include "fixedValue.H"
 #include "ChebyshevSmoother.H"
 #include "PrecisionAdaptor.H"
+#include "gamgTimers.H"     // Added: gv_* timers (GAMG/timers/)
 #include "lambdaOptMinList.H"
 
 #include "diagonalPreconditioner.H"
@@ -167,6 +168,7 @@ void Foam::ChebyshevSmoother::smooth_
 )  const
 {
     const label nCells = psi.size();
+    GV_TIMER_LEVEL(tSmooth, "smooth", nCells);     // Added: the whole smoother
 
     solveScalar* __restrict__ psiPtr = psi.begin();
 
@@ -183,6 +185,7 @@ void Foam::ChebyshevSmoother::smooth_
     const scalar lambdaMin = lambdaMin_;
 
     // get spectral radius estimate
+    GV_TIMER_LEVEL(tEig, "smooth_eig", nCells);     // Added: its Amuls use the ldu matrix
     const scalar spRadius = const_cast<eigenValueSolver&>(spRadiusEstimator_()).maxEigenvalue
     (
         matrix_,
@@ -191,6 +194,7 @@ void Foam::ChebyshevSmoother::smooth_
         interfaces_,
         cmpt
     );
+    tEig.stop();     // Added
 
     if ((log_ >= 2) || (lduMatrix::debug >= 2))
     {
@@ -205,13 +209,16 @@ void Foam::ChebyshevSmoother::smooth_
     const scalar alpha1 = 2 * rho0 / ((lambdaMax - lambdaMin) * spRadius);
 
     // --- Calculate A.psi
-    if (cmatrix_)
     {
-        (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-    }
-    else
-    {
-        matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        GV_TIMER_LEVEL(tAmul, "smooth_amul", nCells);     // Added
+        if (cmatrix_)
+        {
+            (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
+        else
+        {
+            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+        }
     }
 
     preconditioner_->precondition(wA,source - Apsi);
@@ -250,13 +257,16 @@ void Foam::ChebyshevSmoother::smooth_
         const scalar alpha1n = 4.* rhon / ((lambdaMax - lambdaMin) * spRadius);
 
         // --- Calculate A.psi
-        if (cmatrix_)
         {
-            (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
-        }
-        else
-        {
-            matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            GV_TIMER_LEVEL(tAmul, "smooth_amul", nCells);     // Added
+            if (cmatrix_)
+            {
+                (*cmatrix_).Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
+            else
+            {
+                matrix_.Amul(Apsi, psi, interfaceBouCoeffs_, interfaces_, cmpt);
+            }
         }
         
         preconditioner_->precondition(wA, source - Apsi);

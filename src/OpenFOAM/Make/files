@@ -503,6 +503,7 @@ $(GAMG)/GAMGSolverAgglomerateMatrix.C
 $(GAMG)/GAMGSolverInterpolate.C
 $(GAMG)/GAMGSolverScale.C
 $(GAMG)/GAMGSolverSolve.C
+$(GAMG)/timers/sdv_tracing_local.C
 
 GAMGInterfaces = $(GAMG)/interfaces
 $(GAMGInterfaces)/GAMGInterface/GAMGInterface.C
